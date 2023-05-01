@@ -41,7 +41,7 @@ class Clubs
         return $this->toClub($this->clubs->get($id));
     }
     
-    function find(string $query, string $sort, array $options, int $page = 1, ?int $perPage = NULL): \Traversable
+    function find(string $query="", string $sort="id", array $options=[], int $page = 1, ?int $perPage = NULL): \Traversable
     {
         $query  = "%$query%";
         $result = $this->clubs->where("name LIKE ? OR about LIKE ?", $query, $query)->order("$sort");

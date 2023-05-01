@@ -223,7 +223,7 @@
             <div id="searchOption">
             <p class="{if $thisUser->getSearchAppear() == 0}searchOptionName{else}searchOptionName2014{/if}" onclick="expandOptions('polit')">{if $thisUser->getSearchAppear() == 0}<img id="polit_arrow" src="/assets/packages/static/openvk/img/down.png">{/if}{_politViews}</p>
             <select id="polit" name="politViews" style="width:150px;" form="searcher">
-                <option n:foreach="range(0, 8) as $i" value="{$i}" {if $_GET['politViews'] == $i}selected{/if} form="searcher">
+                <option n:foreach="range(0, 9) as $i" value="{$i}" {if $_GET['politViews'] == $i}selected{/if} form="searcher">
                     {tr("politViews_".$i)}
                 </option>
             </select>

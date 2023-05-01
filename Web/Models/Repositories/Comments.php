@@ -50,7 +50,7 @@ class Comments
         foreach($comments as $comment)
             yield $this->toComment($comment);
     }
-    function find(string $query, string $sort): \Traversable
+    function find(string $query="", string $sort="id", array $options = []): \Traversable
     {
         $query  = "%$query%";
         $result = $this->comments->where("content LIKE ?", $query)->where("deleted", 0)->order("$sort");

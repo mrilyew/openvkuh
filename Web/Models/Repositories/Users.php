@@ -48,7 +48,7 @@ class Users
     {
         return $this->toUser($this->users->where("user", $user->getId())->fetch());
     }
-    function find(string $query, string $sort, array $options): Util\EntityStream
+    function find(string $query="", string $sort="id", array $options = []): Util\EntityStream
     {
         $query  = "%$query%";
         $nnArr = [];

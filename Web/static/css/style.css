@@ -948,6 +948,7 @@ table.User {
 .container_gray .contentEx {
     background: #f7f7f7;
     padding: 4px;
+    background-color: white;
     border: #DEDEDE solid 1px;
     margin-bottom: 6px;
     overflow: hidden;
@@ -2450,8 +2451,8 @@ a.poll-retract-vote {
 .clearQuery
 {
     position:absolute;
-    margin-left:530px;
-    margin-top:1px;
+    margin-left:467px;
+    margin-top:3px;
     cursor:pointer;
 }
 .searchOptions
