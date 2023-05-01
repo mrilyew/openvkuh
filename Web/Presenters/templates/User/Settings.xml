@@ -563,6 +563,17 @@
                         </td>
                     </tr>
                     <tr>
+                        <td width="120" valign="top">
+                            <span class="nobold">{_ui_settings_search_appear}</span>
+                        </td>
+                        <td>
+                            <select name="search_appear">
+                                <option value="0" {if !$user->getSearchAppear()}selected{/if}>VK 2010</option>
+                                <option value="1" {if $user->getSearchAppear()}selected{/if}>VK 2014</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
                         <td width="120" valign="top" align="right">
                             <input type="checkbox" name="theme_for_session" value="1">
                         </td>

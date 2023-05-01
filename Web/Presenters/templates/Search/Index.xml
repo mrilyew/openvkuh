@@ -1,10 +1,14 @@
 {extends "../@listView.xml"}
-
+{var $what = $type}
 {block title}
     {if $type === "users"}
         {tr("search_for_people")}
-    {else}
+    {elseif $type === "groups"}
         {tr("search_for_groups")}
+    {elseif $type === "comments"}
+        {tr("search_for_comments")}
+    {elseif $type === "posts"}
+        {tr("search_for_posts")}
     {/if}
     {if $_GET['query']}
         - {$_GET['query']}
@@ -12,60 +16,128 @@
 {/block}
 
 {block header}
-    {=OPENVK_ROOT_CONF["openvk"]["appearance"]["name"]} »
-    {if $type === "users"}
-        {tr("search_for_people")}
-    {else}
-        {tr("search_for_groups")}
-    {/if}
+    {tr("search")}
 {/block}
 
 {* BEGIN ELEMENTS DESCRIPTION *}
 
 {block tabs}
-    <div {if $type === "users"}id="activetabs"{/if} class="tab">
-        <a {if $type === "users"}id="act_tab_a"{/if} href="/search?type=users{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}">
-            {_users}
-        </a>
-    </div>
-    <div {if $type === "groups"}id="activetabs"{/if} class="tab">
-        <a {if $type === "groups"}id="act_tab_a"{/if} href="/search?type=groups{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}">
-            {_groups}
-        </a>
-    </div>
-</div>
-<form class="header_search_inputbt">
+{if $thisUser->getSearchAppear() == 0}
+<b>{tr("results", $count)} ({tr("displaying", $page, $count > 10 ? 10 : $count)})</b>
+{else}
+<form class="header_search_inputbt" id="searcher">
     <input name="type" type="hidden" value="{$type ?? 'users'}" />
-    <input name="query" class="header_search_input" placeholder="{_search_placeholder}" value="{$_GET['query'] ?? ''}" />
+    <input name="query" class="header_search_input" placeholder="{_search_placeholder}" value="{$_GET['query'] ?? ''}"/>
+    <img src="/assets/packages/static/openvk/img/clear.png" class="clearQuery" onclick="document.getElementsByClassName('header_search_input')[0].value = '';document.getElementsByClassName('clearQuery')[0].setAttribute('hidden', 'hidden');" hidden>
+    <script>
+        document.getElementsByClassName("header_search_input")[0].oninput = () => {
+            if(document.getElementsByClassName('header_search_input')[0].value.length == 0)
+            {
+                document.getElementsByClassName('clearQuery')[0].setAttribute("hidden", "hidden");
+            }
+            else
+            {
+                document.getElementsByClassName('clearQuery')[0].removeAttribute("hidden");
+            }
+        }
+    </script>
     <button class="button_search">{_search_button}</button>
 </form>
-
-<p style="margin-left: 15px; margin-top: 0;">
-    <b>{tr("results", $count)}</b>
-</p>
-<div>
+{if $thisUser->getSearchAppear() == 1}
+<ul class="searchListHorizontal">
+    <li {if $type === "users"}id="used"{/if}><a href="/search?type=users{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}&sort=id">{_users}</a></li>
+    <li {if $type === "groups"}id="used"{/if}><a href="/search?type=groups{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}&sort=id">{_groups}</a></li>
+    <li {if $type === "comments"}id="used"{/if}><a href="/search?type=comments{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}&sort=id">{_comments}</a></li>
+    <li {if $type === "posts"}id="used"{/if}><a href="/search?type=posts{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}&sort=id">{_posts}</a></li>
+</ul>
+{/if}
+{/if}
 {/block}
-
+{block count}
+<p>
+    {if $thisUser->getSearchAppear() == 1}
+    <b>{tr("results", $count)} ({tr("displaying", $page, $count > 10 ? 10 : $count)})</b>
+    {/if}
+</p>
+{/block}
 {block link|strip|stripHtml}
+    {if $type == "users" || $type == "groups"}
     {$x->getURL()}
+    {elseif $type == "comments"}
+    {$x->getOwner()->getURL()}
+    {/if}
 {/block}
 
 {block preview}
+    {if $type == "users" || $type == "groups"}
     <img src="{$x->getAvatarUrl('miniscule')}" width="75" alt="{_photo}" />
+    {elseif $type == "comments" || $type == "posts"}
+    <img src="{$x->getOwner()->getAvatarUrl('miniscule')}" width="30" alt="{_photo}" />
+    {/if}
 {/block}
 
 {block name}
+    {if $type == "users" || $type == "groups"}
     <text style="overflow: hidden;">&nbsp;{$x->getCanonicalName()}</text>
     <img n:if="$x->isVerified()" 
         class="name-checkmark"
         src="/assets/packages/static/openvk/img/checkmark.png"
     />
+    {elseif $type == "comments" || $type == "posts"}
+    <text style="overflow: hidden;">&nbsp;{$x->getOwner()->getCanonicalName()}</text>
+    <img n:if="$x->getOwner()->isVerified()" 
+        class="name-checkmark"
+        src="/assets/packages/static/openvk/img/checkmark.png"
+    />
+    {/if}
 {/block}
-
 {block description}
+    {if $type == "users" || $type == "groups"}
     <table class="ugc-table">
         <tbody>
             {if $type === "users"}
+                {if !is_null($_GET['status']) && $_GET['status'] != ""}
+                <tr>
+                    <td><span class="nobold">{_status}:</span></td>
+                    <td>{$x->getStatus()}</td>
+                </tr>
+                {/if}
+                {if !is_null($_GET['city']) && $_GET['city'] != "" && $x->getPrivacySetting("page.info.read") > 1}
+                <tr>
+                    <td><span class="nobold">{_hometown}:</span></td>
+                    <td>{$x->getHometown()}</td>
+                </tr>
+                {/if}
+                {if !is_null($_GET['politViews']) && $_GET['politViews'] != 0 && $x->getPrivacySetting("page.info.read") > 1}
+                <tr>
+                    <td><span class="nobold">{_politViews}:</span></td>
+                    <td>{tr("politViews_".$x->getPoliticalViews())}</td>
+                </tr>
+                {/if}
+                {if !is_null($_GET['email']) && $_GET['email'] != "" && $x->getPrivacySetting("page.info.read") > 1}
+                <tr>
+                    <td><span class="nobold">{_email}:</span></td>
+                    <td>{$x->getContactEmail()}</td>
+                </tr>
+                {/if}
+                {if !is_null($_GET['telegram']) && $_GET['telegram'] != "" && $x->getPrivacySetting("page.info.read") > 1}
+                <tr>
+                    <td><span class="nobold">{_telegram}:</span></td>
+                    <td><a href="tg://resolve?domain={$x->getTelegram()}">@{$x->getTelegram()}</a></td>
+                </tr>
+                {/if}
+                {if !is_null($_GET['site']) && $_GET['site'] != "" && $x->getPrivacySetting("page.info.read") > 1}
+                <tr>
+                    <td><span class="nobold">{_personal_website}:</span></td>
+                    <td><a href="{$x->getWebsite()}">{$x->getWebsite()}</a></td>
+                </tr>
+                {/if}
+                {if !is_null($_GET['address']) && $_GET['address'] != "" && $x->getPrivacySetting("page.info.read") > 1}
+                <tr>
+                    <td><span class="nobold">{_address}:</span></td>
+                    <td><a href="{$x->getPhysicalAddress()}">{$x->getPhysicalAddress()}</a></td>
+                </tr>
+                {/if}
                 <tr>
                     <td><span class="nobold">{_gender}: </span></td>
                     <td>{$x->isFemale() ? tr("female") : tr("male")}</td>
@@ -89,4 +161,86 @@
             </tr>
         </tbody>
     </table>
+    {elseif $type == "comments" || $type == "posts"}
+    {$x->getText()|noescape}
+    {/if}
+{/block}
+{block searchOptions}
+        <div class="searchOptions">
+            {if $thisUser->getSearchAppear() == 0}
+            <ul class="searchList">
+                <li {if $type === "users"}id="used"{/if}><a href="/search?type=users{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}&sort=id">{_users} {if $type === "users"}({$count}){/if}</a></li>
+                <li {if $type === "groups"}id="used"{/if}><a href="/search?type=groups{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}&sort=id">{_groups} {if $type === "groups"}({$count}){/if}</a></li>
+                <li {if $type === "comments"}id="used"{/if}><a href="/search?type=comments{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}&sort=id">{_comments} {if $type === "comments"}({$count}){/if}</a></li>
+                <li {if $type === "posts"}id="used"{/if}><a href="/search?type=posts{if $_GET['query']}&query={urlencode($_GET['query'])}{/if}&sort=id">{_posts} {if $type === "posts"}({$count}){/if}</a></li>
+            </ul>
+            {/if}
+            <div id="searchOption">
+                <p class="{if $thisUser->getSearchAppear() == 0}searchOptionName{else}searchOptionName2014{/if}" onclick="expandOptions('sorting')">{if $thisUser->getSearchAppear() == 0}<img id="sorting_arrow" src="/assets/packages/static/openvk/img/down.png">{/if}{_order}</p>
+                <select name="sort" style="width:150px;" form="searcher" id="sorting">
+                    <option value="id" {if $_GET['sort'] == "id"}selected{/if}>{_sort_id}</option>
+                    {if $type === "users"}
+                    <option value="first_name" {if $_GET['sort'] == "first_name"}selected{/if}>{_sort_first_name}</option>
+                    {/if}
+                    {if $type === "users" && OPENVK_ROOT_CONF["preferences"]["commerce"] != false}
+                    <option value="rating" {if $_GET['sort'] == "rating"}selected{/if}>{_sort_rating}</option>
+                    {/if}
+                    <option value="random" {if $_GET['sort'] == "random"}selected{/if}>{_sort_random}</option>
+                </select><br id="sorting">
+                <input name="desc" type="checkbox" class="desc" {if !is_null($_GET['desc']) && $_GET['desc'] == "on"}checked{/if} form="searcher" id="sorting"><label id="sorting">{_invert}</label>
+            </div>
+            {if $type === "users"}
+            <div id="searchOption">
+            <p class="{if $thisUser->getSearchAppear() == 0}searchOptionName{else}searchOptionName2014{/if}" onclick="expandOptions('main')">{if $thisUser->getSearchAppear() == 0}<img id="main_arrow" src="/assets/packages/static/openvk/img/down.png">{/if}{_main_information}</p>
+            <input type="text" name="status" placeholder="{_status}" value="{if !is_null($_GET['status'])}{$_GET['status']}{/if}" form="searcher" id="main"><br id="main">
+            </div>
+            <div id="searchOption">
+            <p class="{if $thisUser->getSearchAppear() == 0}searchOptionName{else}searchOptionName2014{/if}" onclick="expandOptions('region')">{if $thisUser->getSearchAppear() == 0}<img id="region_arrow" src="/assets/packages/static/openvk/img/down.png">{/if}{_region}</p>
+            <!--<input name="country" placeholder=""> Я вспомнил что тут нельзя указывать страну-->
+            <input type="text" id="region" name="city" placeholder="{_city}" value="{if !is_null($_GET['city'])}{$_GET['city']}{/if}" form="searcher">
+            <!--
+            <p class="searchOptionName"><img src="/assets/packages/static/openvk/img/down.png">{_age}</p>
+            <div class="searchOptionNameInput">
+                <input type="number" name="age1" style="width:50px" min="0" max="100">
+                -
+                <input type="number" name="age2" style="width:50px" min="0" max="100">
+            </div>
+            -->
+            </div>
+            <div id="searchOption">
+            <p class="{if $thisUser->getSearchAppear() == 0}searchOptionName{else}searchOptionName2014{/if}" onclick="expandOptions('gender')">{if $thisUser->getSearchAppear() == 0}<img id="gender_arrow" src="/assets/packages/static/openvk/img/down.png">{/if}{_gender}</p>
+            <input id="gender" type="checkbox" name="male" {if !is_null($_GET['male'])}checked{/if} form="searcher"><label id="gender">{_male_b}</label><br id="gender">
+            <input id="gender" type="checkbox" name="female" {if !is_null($_GET['female'])}checked{/if} form="searcher"><label id="gender">{_female_b}</label><br id="gender">
+            </div>
+            <div id="searchOption">
+            <p class="{if $thisUser->getSearchAppear() == 0}searchOptionName{else}searchOptionName2014{/if}" onclick="expandOptions('maritalstatus')">{if $thisUser->getSearchAppear() == 0}<img id="maritalstatus_arrow" src="/assets/packages/static/openvk/img/down.png">{/if}{_relationship}</p>
+            <select id="maritalstatus" name="maritalstatus" style="width:150px;" form="searcher">
+                <option n:foreach="range(0, 8) as $i" value="{$i}" {if $_GET['maritalstatus'] == $i}selected{/if} form="searcher">
+                    {tr("relationship_".$i)}
+                </option>
+            </select>
+            </div>
+            <div id="searchOption">
+            <p class="{if $thisUser->getSearchAppear() == 0}searchOptionName{else}searchOptionName2014{/if}" onclick="expandOptions('polit')">{if $thisUser->getSearchAppear() == 0}<img id="polit_arrow" src="/assets/packages/static/openvk/img/down.png">{/if}{_politViews}</p>
+            <select id="polit" name="politViews" style="width:150px;" form="searcher">
+                <option n:foreach="range(0, 8) as $i" value="{$i}" {if $_GET['politViews'] == $i}selected{/if} form="searcher">
+                    {tr("politViews_".$i)}
+                </option>
+            </select>
+            </div>
+            <div id="searchOption">
+                <p class="{if $thisUser->getSearchAppear() == 0}searchOptionName{else}searchOptionName2014{/if}" onclick="expandOptions('contacts')">{if $thisUser->getSearchAppear() == 0}<img id="contacts_arrow" src="/assets/packages/static/openvk/img/down.png">{/if}{_contacts}</p>
+                <input type="text" id="contacts" name="email" value="{if !is_null($_GET['email'])}{$_GET['email']}{/if}" form="searcher" placeholder="{_email}">
+                <input type="text" id="contacts" class="marginner" name="telegram" value="{if !is_null($_GET['telegram'])}{$_GET['telegram']}{/if}" form="searcher" placeholder="{_telegram}"><br id="contacts">
+                <input type="text" id="contacts" class="marginner" name="site" value="{if !is_null($_GET['site'])}{$_GET['site']}{/if}" form="searcher" placeholder="{_personal_website}"><br id="contacts">
+                <input type="text" id="contacts" class="marginner" name="address" value="{if !is_null($_GET['address'])}{$_GET['address']}{/if}" form="searcher" placeholder="{_address}">
+            </div>
+            <!--
+                <input type="checkbox" name="with_photo" {if !is_null($_GET['with_photo'])}checked{/if}><label>{_with_photo}</label><br>
+                <input type="checkbox" name="now_on_site" {if !is_null($_GET['now_on_site'])}checked{/if}><label>{_now_on_site}</label><br>
+            -->
+            {/if}
+            <br>
+            <input class="button" type="reset" value="{_reset}" form="searcher">
+        </div>
 {/block}

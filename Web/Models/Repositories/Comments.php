@@ -50,7 +50,13 @@ class Comments
         foreach($comments as $comment)
             yield $this->toComment($comment);
     }
-    
+    function find(string $query, string $sort): \Traversable
+    {
+        $query  = "%$query%";
+        $result = $this->comments->where("content LIKE ?", $query)->where("deleted", 0)->order("$sort");
+        
+        return new Util\EntityStream("Comment", $result);
+    }
     function getCommentsCountByTarget(Postable $target): int
     {
         return sizeof($this->comments->where([

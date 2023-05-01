@@ -48,13 +48,78 @@ class Users
     {
         return $this->toUser($this->users->where("user", $user->getId())->fetch());
     }
-    
-    function find(string $query): Util\EntityStream
+    function find(string $query, string $sort, array $options): Util\EntityStream
     {
         $query  = "%$query%";
+        $nnArr = [];
+        #$nnOptionsName = [];
+        $nnOptionsValue = [];
+        foreach($options as $optionName=>$option)
+        {
+            $option != NULL ? $nnArr+=["$optionName"=>"$option"] : NULL;
+            $option != NULL ? array_push($nnOptionsValue, "$option") : NULL;
+        }
         $result = $this->users->where("CONCAT_WS(' ', first_name, last_name, pseudo, shortcode) LIKE ?", $query)->where("deleted", 0);
+        $nnLength = count($nnOptionsValue);
+        if(!is_null($nnArr["male"]) && !is_null($nnArr["female"]) && $nnArr["male"] = $nnArr["female"])
+        {
+            unset($nnArr["male"]);
+            unset($nnArr["female"]);
+        }
+        #Поговнокодим?
+        if($nnLength == 0)
+        {
+            return new Util\EntityStream("User", $result->order("$sort"));
+        }
+        else
+        {
+            if(!is_null($nnArr["hometown"]))
+            {
+                $result->where("hometown LIKE ?", $nnArr["hometown"]);
+            }
+            if(!is_null($nnArr["male"]) && $nnArr["male"] == 1)
+            {
+                $result->where("sex LIKE ?", 0);
+            }
+            if(!is_null($nnArr["female"]) && $nnArr["female"] == 1)
+            {
+                $result->where("sex LIKE ?", 1);
+            }
+            if(!is_null($nnArr["maritalstatus"]))
+            {
+                $result->where("marital_status LIKE ?", $nnArr["maritalstatus"]);
+            }
+            if(!is_null($nnArr["status"]))
+            {
+                $result->where("status LIKE ?", $nnArr["status"]);
+            }
+            if(!is_null($nnArr["politViews"]))
+            {
+                $result->where("polit_views LIKE ?", $nnArr["politViews"]);
+            }
+            if(!is_null($nnArr["email"]))
+            {
+                $result->where("email_contact LIKE ?", $nnArr["email"]);
+            }
+            if(!is_null($nnArr["telegram"]))
+            {
+                $result->where("telegram LIKE ?", $nnArr["telegram"]);
+            }
+            if(!is_null($nnArr["site"]))
+            {
+                $result->where("website LIKE ?", $nnArr["site"]);
+            }
+            if(!is_null($nnArr["address"]))
+            {
+                $result->where("address LIKE ?", $nnArr["address"]);
+            }
+            /*elseif(!is_null($nnArr["now_on_site"]))
+            {
+                $result = $result->where("CONCAT_WS(' ', online) LIKE ?", t);
+            }*/
+            return new Util\EntityStream("User", $result->order("$sort"));
+        }
         
-        return new Util\EntityStream("User", $result);
     }
     
     function getStatistics(): object
