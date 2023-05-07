@@ -4,6 +4,29 @@ use openvk\Web\Models\Exceptions\InvalidUserNameException;
 
 final class Account extends VKAPIRequestHandler
 {
+
+    function ban(string $owner_id): int
+    {
+        $this->requireUser();
+        $this->willExecuteWriteAction();
+        #чс же нету
+        return 1;
+    }
+    function unban(string $owner_id): int
+    {
+        $this->requireUser();
+        $this->willExecuteWriteAction();
+        #чс же нету
+        return 1;
+    }
+    function changePassword(string $restore_sid, string $change_password_hash, string $old_password, string $new_password)
+    {
+        $this->requireUser();
+        $this->willExecuteWriteAction();
+        return (object) [
+            "token"     => $access_token
+        ];
+    }
     function getProfileInfo(): object
     {
         $this->requireUser();

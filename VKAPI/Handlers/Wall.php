@@ -9,6 +9,10 @@ use openvk\Web\Models\Entities\Post;
 use openvk\Web\Models\Repositories\Posts as PostsRepo;
 use openvk\Web\Models\Entities\Comment;
 use openvk\Web\Models\Repositories\Comments as CommentsRepo;
+use openvk\Web\Models\Entities\Photo;
+use openvk\Web\Models\Repositories\Photos as PhotosRepo;
+use openvk\Web\Models\Entities\Video;
+use openvk\Web\Models\Repositories\Videos as VideosRepo;
 
 final class Wall extends VKAPIRequestHandler
 {
@@ -363,8 +367,10 @@ final class Wall extends VKAPIRequestHandler
             ];
     }
 
-    function post(string $owner_id, string $message = "", int $from_group = 0, int $signed = 0): object
+    function post(string $owner_id, string $message = "", int $from_group = 0, int $signed = 0, string $attachments = ""): object
     {
+        # Аттачи такого вида: [тип] [id владельца]_[id вложения]
+        # Пример: photo 1_1
         $this->requireUser();
         $this->willExecuteWriteAction();
 
@@ -401,25 +407,6 @@ final class Wall extends VKAPIRequestHandler
         if($signed == 1)
             $flags |= 0b01000000;
 
-        # TODO: Compatible implementation of this
-        try {
-            $photo = NULL;
-            $video = NULL;
-            if($_FILES["photo"]["error"] === UPLOAD_ERR_OK) {
-                $album = NULL;
-                if(!$anon && $owner_id > 0 && $owner_id === $this->getUser()->getId())
-                    $album = (new AlbumsRepo)->getUserWallAlbum($wallOwner);
-
-                $photo = Photo::fastMake($this->getUser()->getId(), $message, $_FILES["photo"], $album, $anon);
-            }
-
-            if($_FILES["video"]["error"] === UPLOAD_ERR_OK)
-                $video = Video::fastMake($this->getUser()->getId(), $message, $_FILES["video"], $anon);
-        } catch(\DomainException $ex) {
-            $this->fail(-156, "The media file is corrupted");
-        } catch(ISE $ex) {
-            $this->fail(-156, "The media file is corrupted or too large ");
-        }
 
         if(empty($message) && !$photo && !$video)
             $this->fail(100, "Required parameter 'message' missing.");
@@ -436,12 +423,28 @@ final class Wall extends VKAPIRequestHandler
         } catch(\LogicException $ex) {
             $this->fail(100, "One of the parameters specified was missing or invalid");
         }
-
-        if(!is_null($photo))
-            $post->attach($photo);
-
-        if(!is_null($video))
-            $post->attach($video);
+        
+        if(!empty($attachments))
+        {
+            $att = explode(" ", $attachments);
+            $attachmentType = $att[0]; 
+            #photo, video
+    
+            $attachmentOwner = (int)explode("_", $att[1])[0];
+            $attachmentId = (int)end(explode("_", $att[1]));
+            
+            $attacc = NULL;
+            if($attachmentType == "photo")
+            {
+                $attacc = (new PhotosRepo)->getByOwnerAndVID($attachmentOwner, $attachmentId);
+                $post->attach($attacc);
+            }
+            elseif($attachmentType == "video")
+            {
+                $attacc = (new VideosRepo)->getByOwnerAndVID($attachmentOwner, $attachmentId);
+                $post->attach($attacc);
+            }
+        }
 
         if($wall > 0 && $wall !== $this->user->identity->getId())
             (new WallPostNotification($wallOwner, $post, $this->user->identity))->emit();
