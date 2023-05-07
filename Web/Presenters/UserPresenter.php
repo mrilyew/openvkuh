@@ -452,6 +452,8 @@ final class UserPresenter extends OpenVKPresenter
 
                 if(in_array($this->postParam("main_page"), [0, 1]))
                     $user->setMain_Page((int) $this->postParam("main_page"));
+                if(in_array($this->postParam("search_appear"), [0, 1]))
+                    $user->setSearchAppear((int) $this->postParam("search_appear"));
             } else if($_GET['act'] === "lMenu") {
                 $settings = [
                     "menu_bildoj"    => "photos",
