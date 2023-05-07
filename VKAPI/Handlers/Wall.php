@@ -449,7 +449,7 @@ final class Wall extends VKAPIRequestHandler
         return (object)["post_id" => $post->getVirtualId()];
     }
 
-    function repost(string $object, string $message = "") {
+    function repost(string $object, string $message = "", int $group_id = NULL) {
         $this->requireUser();
         $this->willExecuteWriteAction();
 
@@ -462,7 +462,14 @@ final class Wall extends VKAPIRequestHandler
         
         $nPost = new Post;
         $nPost->setOwner($this->user->getId());
-        $nPost->setWall($this->user->getId());
+        if(is_null($group_id))
+        {
+            $nPost->setWall($this->user->getId());
+        }
+        else
+        {
+            $nPost->setWall(-$group_id);
+        }
         $nPost->setContent($message);
         $nPost->setApi_Source_Name($this->getPlatform());
         $nPost->save();

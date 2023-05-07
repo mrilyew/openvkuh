@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function() { //BEGIN
     u("#_newPicture").on("click", function(e) {
         MessageBox(tr('new_photo'), 
         "<form id='tmpPhDelF' action='" + u(this).attr("href") + "' method='POST' enctype='multipart/form-data'>"+
-        "<div id='tmpdd' style='text-align:center'>"+tr('formats')+"<br><br>"+
+		 "<div id='tmpdd' style='text-align:center'>"+tr('formats')+"<br><br>"+
         "<label class=\"button\" style=\"\">"+tr('browse')+
         "<input type=\"file\" id=\"blob\" name=\"blob\" style=\"display: none;\" onchange=\"filename.innerHTML=blob.files[0].name\" /></label>"+
         "<div id=\"filename\" style=\"margin-top: 10px;\"></div>"+
@@ -135,11 +135,11 @@ document.addEventListener("DOMContentLoaded", function() { //BEGIN
         MessageBox(tr('new_photo'), 
         "<form id='tmpPhDelF' action='" + u(this).attr("href") + "' method='POST' enctype='multipart/form-data'>"+
         "<div id='tmpdd' style='text-align:center'>"+tr('good_photo')+
-	"<br><br>"+tr('formats')+"<br><br>"+
-	"<label class=\"button\" style=\"\">"+tr('browse')+
-        "<input type=\"file\" id=\"ava\" name=\"ava\" style=\"display: none;\" onchange=\"filename.innerHTML=ava.files[0].name\" /></label>"+
-        "<div id=\"filename\" style=\"margin-top: 10px;\"></div>"+
-	"<br><br>"+tr('upload_problems')+"<br></div>"+
+		"<br><br>"+tr('formats')+"<br><br>"+
+		"<label class=\"button\" style=\"\">"+tr('browse')+
+		"<input type=\"file\" id=\"ava\" name=\"ava\" style=\"display: none;\" onchange=\"filename.innerHTML=ava.files[0].name\" /></label>"+
+		"<div id=\"filename\" style=\"margin-top: 10px;\"></div>"+
+		"<br><br>"+tr('upload_problems')+"<br></div>"+
         //"<p><input type='checkbox' name='makeAvatarPost' value='1'>"+tr('leave_photo')+"</p>"+
         "<input type='hidden' name='hash' value='" + u("meta[name=csrf]").attr("value") + "' />"+
         "</form>", [
@@ -237,12 +237,37 @@ document.addEventListener("DOMContentLoaded", function() { //BEGIN
 
 }); //END ONREADY DECLS
 
-function repostPost(id, hash) {
-	uRepostMsgTxt  = tr('your_comment') + ": <textarea id='uRepostMsgInput_"+id+"'></textarea><br/><br/>";
-	
+function repostPost(id, hash, owner) {
+	uRepostMsgTxt  = `
+    ${tr('auditory')}:<br/>
+    <input type="radio" name="type" onchange="signs.setAttribute('hidden', 'hidden');groupId.setAttribute('hidden', 'hidden')" value="wall" checked>${tr("in_wall")}<br/>
+    <input type="radio" name="type" onchange="signs.removeAttribute('hidden');groupId.removeAttribute('hidden')" value="group">${tr("in_group")}<br/>
+    <select style="width:50%;" id="groupId" name="groupId" hidden>
+    </select><br/>
+    ${tr('your_comment')}: 
+    <textarea id='uRepostMsgInput_${id}'></textarea>
+    <div id="signs" hidden>
+    <label><input type="checkbox" id="asgroup" name="asGroup" value="1">${tr('post_as_group')}</label><br>
+    <label><input type="checkbox" id="signed" name="signed" value="1">${tr('add_signature')}</label>
+    </div>
+    <br/><br/>`;
+    let clubs = [];
 	MessageBox(tr('share'), uRepostMsgTxt, [tr('send'), tr('cancel')], [
 		(function() {
 			text = document.querySelector("#uRepostMsgInput_"+id).value;
+            type = "user";
+            radios = document.querySelectorAll('input[name="type"]')
+            for(const r of radios)
+            {
+                if(r.checked)
+                {
+                    type = r.value;
+                    break;
+                }
+            }
+            groupId = document.querySelector("#groupId").value;
+            asGroup = asgroup.value;
+            signed = signed.value;
 			hash = encodeURIComponent(hash);
 			xhr = new XMLHttpRequest();
 			xhr.open("POST", "/wall"+id+"/repost?hash="+hash, true);
@@ -255,10 +280,21 @@ function repostPost(id, hash) {
                     NewNotification(tr('information_-1'), tr('shared_succ'), null, () => {window.location.href = "/wall" + jsonR.wall_owner});
 				}
 			});
-			xhr.send('text=' + encodeURI(text));
+			xhr.send('text=' + encodeURI(text) + '&type=' + encodeURI(type) + '&groupId=' + encodeURI(groupId) + "&asGroup="+encodeURI(asGroup) + "&signed="+encodeURI(signed));
 		}),
 		Function.noop
 	]);
+    let xhrj = new XMLHttpRequest();
+    xhrj.open("GET", "id"+owner+"/getOwnedClubs?hash="+hash)
+    xhrj.send()
+    xhrj.onload = () =>
+    {
+        clubs = JSON.parse(xhrj.responseText);
+        for(const el of clubs)
+        {
+            document.getElementById("groupId").insertAdjacentHTML("beforeend", `<option value="${el.id}">${el.name}</option>`)
+        }
+    }
 }
 
 function setClubAdminComment(clubId, adminId, hash) {
