@@ -90,7 +90,10 @@ class User extends RowModel
     {
         return $this->getRecord()->main_page;
     }
-    
+    function getSearchAppear(): int
+    {
+        return $this->getRecord()->search_appear;
+    }
     function getChandlerGUID(): string
     {
         return $this->getRecord()->user;
@@ -725,7 +728,6 @@ class User extends RowModel
     {
         return $this->getRecord()->nsfw_tolerance;
     }
-
     function isFemale(): bool
     {
         return (bool) $this->getRecord()->sex;
@@ -916,7 +918,10 @@ class User extends RowModel
     {
         $this->stateChanges("nsfw_tolerance", $tolerance);
     }
-
+    function setSearchAppear(int $appear): void
+    {
+        $this->stateChanges("search_appear", $appear);
+    }
     function setPrivacySetting(string $id, int $status): void
     {
         $this->stateChanges("privacy", bmask($this->changes["privacy"] ?? $this->getRecord()->privacy, [

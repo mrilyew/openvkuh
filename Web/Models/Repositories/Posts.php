@@ -109,4 +109,10 @@ class Posts
     {
         return sizeof(clone $this->posts);
     }
+    function find(string $query="", string $sort="id", array $options = []): Util\EntityStream
+    {
+        $query  = "%$query%";
+        $result = $this->posts->where("content LIKE ?", $query)->where("deleted", 0);
+        return new Util\EntityStream("Post", $result->order("$sort"));
+    }
 }

@@ -553,3 +553,37 @@ $(document).on("scroll", () => {
         }, 250);
     }
 })
+function expandOptions(id)
+{
+    if(document.querySelector("#"+id).getAttribute("hidden") == null)
+    {
+        document.querySelectorAll("#"+id).forEach(function(el) {el.setAttribute("hidden", "hidden")});
+        if(document.getElementById(id+"_arrow") != null)
+        {
+            document.getElementById(id+"_arrow").src = "/assets/packages/static/openvk/img/up.png";
+        }
+    }
+    else
+    {
+        document.querySelectorAll("#"+id).forEach(function(el) {el.removeAttribute("hidden")});
+        if(document.getElementById(id+"_arrow") != null)
+        {
+            document.getElementById(id+"_arrow").src = "/assets/packages/static/openvk/img/down.png";
+        }
+    }
+}
+function expandSearch()
+{
+    document.querySelectorAll(".header_navigation > #clickable").forEach(function(el) {el.style.display = "none"})
+    document.getElementById("searchbar").classList.add("searchExpanded")
+    if(document.getElementById("whatFind") != null)
+    {
+        document.getElementById("whatFind").style.display = "block"
+    }
+}
+function decreaseSearch()
+{
+    document.querySelectorAll(".header_navigation > #clickable").forEach(function(el) {el.style.display = "inline-block"})
+    document.getElementById("searchbar").classList.remove("searchExpanded")
+    document.getElementById("whatFind").style.display = "none"
+}

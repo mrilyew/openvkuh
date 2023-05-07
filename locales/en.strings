@@ -472,6 +472,8 @@
 
 "search_for_groups" = "Search for groups";
 "search_for_people" = "Search for people";
+"search_for_comments" = "Search for comments";
+"search_for_posts" = "Search for posts";
 "search_button" = "Find";
 "search_placeholder" = "Start typing any name, title or word";
 "results_zero" = "No results";
@@ -521,6 +523,7 @@
 "ui_settings_view_of_posts_old" = "Old";
 "ui_settings_view_of_posts_microblog" = "Microblog";
 "ui_settings_main_page" = "Main page";
+"ui_settings_search_appear" = "Search Menu";
 "ui_settings_sessions" = "Sessions";
 
 "additional_links" = "Additional links";
@@ -604,6 +607,10 @@
 "sort_randomly" = "Sort randomly";
 "sort_up" = "Sort by ID up";
 "sort_down" = "Sort by ID down";
+"sort_id" = "By id";
+"sort_first_name" = "By name";
+"sort_rating" = "By rating";
+"sort_random" = "By random";
 
 /* Videos */
 
@@ -1440,3 +1447,22 @@
 "tour_section_14_bottom_text_1" = "Screenshots";
 "tour_section_14_bottom_text_2" = "This concludes the tour of the site. If you want to try our mobile app, create your own group here, invite your friends or find new ones, or just have some fun in general, you can do it right now with a small <a href='/reg'>registration</a>";
 "tour_section_14_bottom_text_3" = "This concludes the tour of the site";
+
+/* Search options */
+"region" = "Region";
+"nation" = "Country";
+"age" = "Age";
+"male_b" = "Male";
+"female_b" = "Female";
+"any" = "Any";
+"with_photo" = "with photo";
+"now_on_site" = "now on site";
+"reset" = "Reset";
+"search" = "Search";
+"displaying" = "displaying $1-$2";
+"invert" = "Invert";
+"order" = "Order";
+"search_by_people" = "for people";
+"search_by_groups" = "for groups";
+"search_by_posts" = "for posts";
+"search_by_comments" = "for comments";
