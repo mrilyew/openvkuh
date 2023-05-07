@@ -1,40 +1,48 @@
 /*avatar controls*/
-#avatarEdit
+#deleteButton
+{
+    opacity:0.8;
+}
+#avatarOptionsBlock, #avatarDeleteBlock, #_newPicture, #_newAvatarPicture {
+    -webkit-transition: all 200ms ease-in-out;
+    -moz-transition: all 200ms ease-in-out;
+    -o-transition: all 200ms ease-in-out;
+    transition: all 200ms ease-in-out;
+}
+#avatarDeleteBlock
 {
     position: relative;
+    background-color:rgba(27, 27, 27, 0.8); 
+    opacity:0;
+}
+#avatarOptionsBlock
+{
+    position:absolute;
+    width:100px;
+    background-color:rgba(27, 27, 27, 0.8); 
+    list-style-type: none;
+    font-size:11px;
+    margin-bottom:20px;
+    padding-top:10px;
+    padding-bottom:10px;
+    opacity:0;
 }
 #_avatarDelete 
 {
     position:absolute;
     right:0;
     top:0;
-    background-color:rgba(51, 51, 51, 0); 
+    background-color:rgba(0, 0, 0, 0.7); 
     border-radius: 0px 0px 3px 3px;
     padding:2px;
     padding-left:3px;
+    opacity:1;
 }
-#deleteButton
-{
-    opacity:0;
+div#avatarAll:hover #avatarDeleteBlock {
+    opacity: 1 !important;
+    visibility: visible;
 }
-#avatarChange, #_avatarDelete, #groupAvatarChange {
-    -webkit-transition: all 200ms ease-in-out;
-    -moz-transition: all 200ms ease-in-out;
-    -o-transition: all 200ms ease-in-out;
-    transition: all 200ms ease-in-out;
-}
-#avatarChange
-{
-    position:absolute;
-    width:100px;
-    background-color:rgba(51, 51, 51, 0);
-    list-style-type: none;
-    font-size:11px;
-    padding-top:10px;
-    padding-bottom:10px;
-    opacity:0%;
-}
-div#avatarAll:hover #avatarChange {
+div#avatarAll:hover #avatarOptionsBlock {
     opacity: 1 !important;
     visibility: visible;
 }
@@ -58,27 +66,17 @@ div#avatarAll:hover #avatarChange {
     text-align:center;
     left:20%;
     top:75%;
-}
-.newpict:hover
-{
-    color:#5680a0;
-}
-#groupAvatarChange
-{
-    position:absolute;
-    width:100px;
-    background-color:rgba(51, 51, 51, 0);
-    list-style-type: none;
-    font-size:11px;
-    padding-top:10px;
-    padding-bottom:10px;
-    opacity:0%;
+    color:#5680a0 !important;
 }
 #_newAvatarPicture2
 {
     position:absolute;
     left:0;
     margin-left:20px;
+}
+#_newAvatarPicture
+{
+    color:#B2B2B2;
 }
 #_newAvatarPicture:hover
 {
