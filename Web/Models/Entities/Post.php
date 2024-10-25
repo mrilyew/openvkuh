@@ -133,6 +133,10 @@ class Post extends Postable
                 case 'openvk_legacy_ios':
                     return 'iphone';
                     break;
+
+                case 'windows_phone':
+                    return 'wphone';
+                    break;
                 
                 case 'vika_touch': // кика хохотач ахахахаххахахахахах
                 case 'vk4me':
@@ -174,6 +178,31 @@ class Post extends Postable
             "url"  => NULL,
             "img"  => NULL
         ];
+    }
+
+    function getPostSourceInfo(): array
+    {
+        $post_source = ["type" => "vk"];
+        if($this->getPlatform(true) !== NULL) {
+            $post_source = [
+                "type" => "api",
+                "platform" => $this->getPlatform(true)
+            ];
+        }
+
+        if($this->isUpdateAvatarMessage())
+            $post_source['data'] = 'profile_photo';
+        
+        return $post_source;
+    }
+
+    function getVkApiType(): string
+    {
+        $type = 'post';
+        if($this->getSuggestionType() != 0)
+            $type = 'suggest';
+
+        return $type;
     }
     
     function pin(): void

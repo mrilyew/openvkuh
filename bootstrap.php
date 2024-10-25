@@ -3,6 +3,7 @@ use Chandler\Database\DatabaseConnection;
 use Chandler\Session\Session;
 use openvk\Web\Util\Localizator;
 use openvk\Web\Util\Bitmask;
+use function PHP81_BC\strftime;
 
 function _ovk_check_environment(): void
 {
@@ -198,8 +199,8 @@ function ovk_proc_strtrim(string $string, int $length = 0): string
 function ovk_strftime_safe(string $format, ?int $timestamp = NULL): string
 {
     $sessionOffset = intval(Session::i()->get("_timezoneOffset"));
-    $str = strftime($format, $timestamp + ($sessionOffset * MINUTE) * -1 ?? time() + ($sessionOffset * MINUTE) * -1);
-    if(PHP_SHLIB_SUFFIX === "dll") {
+    $str = strftime($format, $timestamp + ($sessionOffset * MINUTE) * -1 ?? time() + ($sessionOffset * MINUTE) * -1, tr("__locale") !== '@__locale' ? tr("__locale") : NULL);
+    if(PHP_SHLIB_SUFFIX === "dll" && version_compare(PHP_VERSION, "8.1.0", "<")) {
         $enc = tr("__WinEncoding");
         if($enc === "@__WinEncoding")
             $enc = "Windows-1251";
@@ -231,7 +232,7 @@ function ovk_is_ssl(): bool
     return $GLOBALS["requestIsSSL"];
 }
 
-function parseAttachments(string $attachments)
+function parseAttachments(string $attachments): array
 {
     $attachmentsArr = explode(",", $attachments);
     $returnArr      = [];
@@ -248,9 +249,10 @@ function parseAttachments(string $attachments)
         elseif(str_contains($attachment, "audio"))
             $attachmentType = "audio";
 
-        $attachmentIds = str_replace($attachmentType, "", $attachment);
-        $attachmentOwner = (int)explode("_", $attachmentIds)[0];
-        $attachmentId    = (int)end(explode("_", $attachmentIds));
+        $attachmentIds   = str_replace($attachmentType, "", $attachment);
+        $attachmentOwner = (int) explode("_", $attachmentIds)[0];
+        $gatoExplotano   = explode("_", $attachmentIds);
+        $attachmentId    = (int) end($gatoExplotano);
 
         switch($attachmentType) {
             case "photo":

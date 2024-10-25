@@ -184,10 +184,10 @@
 "post_writes_g" = "published";
 "post_deact_m" = "deleted his profile saying:";
 "post_deact_f" = "deleted her profile saying:";
-"post_deact_g" = "deleted they profile saying:";
+"post_deact_g" = "deleted their profile saying:";
 "post_deact_silent_m" = "silently deleted his profile.";
 "post_deact_silent_f" = "silently deleted her profile.";
-"post_deact_silent_f" = "silently deleted they profile.";
+"post_deact_silent_f" = "silently deleted their profile.";
 "post_on_your_wall" = "on your wall";
 "post_on_group_wall" = "in $1";
 "post_on_user_wall" = "on $1's wall";
@@ -265,6 +265,8 @@
 "clubs_posts" = "Group's posts";
 "others_posts" = "Others posts";
 
+"show_more" = "Show more";
+
 /* Friends */
 
 "friends" = "Friends";
@@ -274,6 +276,10 @@
 "friends_delete" = "Remove from friends";
 "friends_reject" = "Reject request";
 "friends_accept" = "Accept request";
+"friends_leave_in_flw" = "Leave in followers";
+"friends_add_msg" = "Now you're friends.";
+"friends_rej_msg" = "You left this user as subscriber.";
+"friends_rem_msg" = "You deleted this user from your friend list.";
 "send_message" = "Send a message";
 "incoming_req" = "Pending";
 "outcoming_req" = "Outgoing";
@@ -480,20 +486,23 @@
 "groups_avatar" = "Good photo can make your group more recognizable.";
 "formats_avatar" = "You can upload an image in JPG, GIF or PNG format.";
 "troubles_avatar" = "If you're having trouble uploading, try selecting a smaller photo.";
-"webcam_avatar" = "If your computer is equipped with a webcam, you can <a href='javascript:'>take a snapshot</a>.";
+"webcam_avatar" = "If your computer has a webcam, you can <a id='_takeSelfie'>take a snapshot »</a>";
+"publish_on_wall" = "Make post on wall";
+"take_snapshot" = "Take snapshot";
+"your_browser_doesnt_support_webcam" = "Your browser does not support webcam video capture.";
 
-"update_avatar_notification" = "Profile photo was updated";
-"update_avatar_description" = "Click to watch";
+"selected_area_user" = "The selected area will be shown on your page.";
+"selected_area_club" = "The selected area will be shown on the group page.";
+"selected_area_rotate" = "If the image is not oriented correctly, the photo can be rotated.";
 
 "deleting_avatar" = "Deleting photo";
 "deleting_avatar_sure" = "Do you sure you want to delete avatar?";
-
-"deleted_avatar_notification" = "Picture successfully deleted";
 
 "save_changes" = "Save changes";
 
 "upd_m" = "updated his profile picture";
 "upd_f" = "updated her profile picture";
+"upd_n" = "updated their profile picture";
 "upd_g" = "updated group's picture";
 
 "add_photos" = "Add photos";
@@ -647,13 +656,14 @@
 "apply_style_for_this_device" = "Apply style only for this device";
 
 "search_for_groups" = "Search for groups";
-"search_for_users" = "Search for people";
+"search_for_users" = "Search for users";
 "search_for_posts" = "Search for posts";
 "search_for_comments" = "Search for comments";
 "search_for_videos" = "Search for videos";
 "search_for_apps" = "Search for apps";
 "search_for_notes" = "Search for notes";
 "search_for_audios" = "Search for music";
+"search_for_audios_playlists" = "Search for playlists";
 "search_button" = "Find";
 "search_placeholder" = "Start typing any name, title or word";
 "results_zero" = "No results";
@@ -790,6 +800,15 @@
 "disable_2fa" = "Turn off 2FA";
 "viewing" = "View";
 
+/* OAuth */
+"identifies_itself_as" = "that identifies itself as $1";
+"located_at_url" = "located at $1";
+"wants_your_token" = "wants to access your account";
+"app_will_have_access_to" = "App will have access to:";
+"oauth_scope_all" = "profile information, status, list of friends, photos, wall posts, audios, videos, notifications, fishing rod handle, messages, gifts, <b>your e-mail</b>, polls, communities, discussions, notes, <b>payment method</b>, likes and comments";
+"oauth_grant" = "Allow";
+"oauth_deny" = "Deny";
+
 /* Sorting */
 
 "sort_randomly" = "Sort randomly";
@@ -845,7 +864,7 @@
 
 "limits" = "Limits";
 "select_audio" = "Select audio from your computer";
-"audio_requirements" = "Audio must be between $1s to $2 minutes, weights to $3MB and contain audio stream.";
+"audio_requirements" = "Audio must be between $1 seconds to $2 minutes, weights to $3 MB and contain audio stream.";
 "audio_requirements_2" = "Audio must not infringe copyright and related rights";
 "you_can_also_add_audio_using" = "You can also add audio from among the files you have already downloaded using";
 "search_audio_inst" = "audios search";
@@ -853,7 +872,7 @@
 "audio_embed_not_found" = "Audio not found";
 "audio_embed_deleted" = "Audio was deleted";
 "audio_embed_withdrawn" = "The audio was withdrawn at the request of the copyright holder";
-"audio_embed_forbidden" = "The user's privacy settings do not allow this embed this audio";
+"audio_embed_forbidden" = "The user's privacy settings do not allow this audio to be embedded";
 "audio_embed_processing" = "Audio is still being processed, or has not been processed correctly.";
 
 "audios_count_zero" = "No audios";
@@ -863,7 +882,7 @@
 "audios_count_other" = "$1 audios";
 
 "track_unknown" = "Unknown";
-"track_noname" = "Without name";
+"track_noname" = "Untitled";
 
 "my_music" = "My music";
 "music_user" = "User's music";
@@ -876,6 +895,7 @@
 "my_playlists" = "My playlists";
 "playlists" = "Playlists";
 "audios_explicit" = "Contains obscene language";
+"audios_unlisted" = "Unlisted";
 "withdrawn" = "Withdrawn";
 "deleted" = "Deleted";
 "owner" = "Owner";
@@ -899,7 +919,7 @@
 "edit_playlist" = "Edit playlist";
 "unable_to_load_queue" = "Error when loading queue.";
 
-"fully_delete_audio" = "Fully delete audio";
+"fully_delete_audio" = "Delete audio";
 "attach_audio" = "Attach audio";
 "detach_audio" = "Detach audio";
 
@@ -927,6 +947,12 @@
 "listens_count_other" = "$1 listens";
 
 "add_audio_to_club" = "Add audio to group";
+"add_audio" = "Adding audio";
+"add_audio_limitations" = "You can select up to 10 groups/playlists.";
+"to_club" = "To club";
+"to_playlist" = "To playlist";
+
+"audio_was_successfully_added" = "Audios was successfully added.";
 "what_club_add" = "Which group do you want to add the song to?";
 "group_has_audio" = "This group already has this song.";
 "group_hasnt_audio" = "This group doesn't have this song.";
@@ -934,6 +960,7 @@
 "by_name" = "by name";
 "by_performer" = "by performer";
 "no_access_clubs" = "There are no groups where you are an administrator.";
+"no_access_playlists" = "You haven't created any playlists.";
 "audio_successfully_uploaded" = "Audio has been successfully uploaded and is currently being processed.";
 
 "broadcast_audio" = "Broadcast audio to status";
@@ -946,6 +973,8 @@
 "repeat_tip" = "Repeat";
 "shuffle_tip" = "Shuffle";
 "mute_tip" = "Mute";
+"playlist_hide_from_search" = "Unlisted";
+"confirm_deleting_audio" = "Do you sure want to delete this audio?";
 
 /* Notifications */
 
@@ -1203,6 +1232,7 @@
 "report_number" = "Report #";
 "list_of_reports" = "List of reports";
 "text_of_the_post" = "Text of the post";
+"delete_content" = "Delete content";
 "today" = "today";
 
 "will_be_watched" = "It will be reviewed by the moderators soon";
@@ -1541,6 +1571,7 @@
 "error_code" = "Error code: $1.";
 "ffmpeg_timeout" = "Timed out waiting ffmpeg. Try to upload file again.";
 "ffmpeg_not_installed" = "Failed to proccess the file. It looks like ffmpeg is not installed on this server.";
+"too_many_or_to_lack" = "Too few or too many sources.";
 
 /* Admin actions */
 
@@ -1600,6 +1631,7 @@
 "admin_user_online_deceased" = "Deceased";
 "admin_club_search" = "Search for groups";
 "admin_club_excludeglobalfeed" = "Do not display posts in the global feed";
+"admin_club_enforceexcludeglobalfeed" = "Disallow group staff from changing global feed status";
 
 "admin_services" = "Paid services";
 "admin_newgift" = "New gift";
@@ -1634,6 +1666,9 @@
 
 "admin_commerce_disabled" = "Commerce has been disabled by the system administrator";
 "admin_commerce_disabled_desc" = "The voucher and gift settings will be saved, but will have no effect.";
+
+"admin_longpool_broken" = "Longpool is broken and will not work!";
+"admin_longpool_broken_desc" = "Make sure file at the path <code>$1</code> exist and have correct rights and ownership.";
 
 "admin_banned_links" = "Blocked links";
 "admin_banned_link" = "Link";
@@ -1718,7 +1753,7 @@
 "about_wall_posts_one" = "<b>1</b> wall post";
 "about_wall_posts_other" = "<b>$1</b> wall posts";
 
-"about_watch_rules" = "Watch <a href='$1'>here</a>.";
+"about_watch_rules" = "See <a href='$1'>here</a>.";
 
 /* Dialogs */
 
@@ -1928,9 +1963,9 @@
 "tour_section_11_title_1" = "Themes";
 "tour_section_11_text_1" = "Upon registration, the default theme will be set as your appearance.";
 "tour_section_11_text_2" = "Some new users might find the current default theme a bit dated.";
-"tour_section_11_text_3" = "<b>No worries:</b> You can create your own theme by reading the <a href='https://docs.openvk.uk/'>documentation</a> or choose one from the catalog.";
+"tour_section_11_text_3" = "<b>No worries:</b> You can create your own theme by reading the <a href='https://docs.ovk.to/'>documentation</a> or choose one from the catalog.";
 "tour_section_11_bottom_text_1" = "A catalog of themes is available under \"My Settings\" in the \"Interface\" tab.";
-"tour_section_11_wordart" = "<img src='https://openvk.uk/assets/packages/static/openvk/img/tour/wordart_en.png' width='65%'>";
+"tour_section_11_wordart" = "<img src='/assets/packages/static/openvk/img/tour/wordart_en.png' width='65%'>";
 
 "tour_section_12_title_1" = "Profile and Group Backgrounds";
 "tour_section_12_text_1" = "You can set two images as the background of your page.";
@@ -1978,24 +2013,23 @@
 
 /* Search */
 
-"s_people" = "People";
+"s_people" = "Users";
 "s_groups" = "Clubs";
-"s_events" = "Events";
 "s_apps" = "Applications";
-"s_questions" = "Questions";
-"s_notes" = "Notes";
-"s_themes" = "Themes";
 "s_posts" = "Posts";
 "s_comments" = "Comments";
 "s_videos" = "Videos";
 "s_audios" = "Music";
-"s_by_people" = "for people";
+"s_audios_playlists" = "Playlists";
+
+"s_by_people" = "for users";
 "s_by_groups" = "for groups";
 "s_by_posts" = "for posts";
 "s_by_comments" = "for comments";
 "s_by_videos" = "for videos";
 "s_by_apps" = "for apps";
-"s_by_audios" = "for musics";
+"s_by_audios" = "for audios";
+"s_by_audios_playlists" = "for playlists";
 
 "s_order_by" = "Order by...";
 
@@ -2006,6 +2040,10 @@
 "s_order_by_length" = "By length";
 "s_order_by_listens" = "By listens count";
 "s_order_invert" = "Invert";
+"s_order_by_reg_date" = "By reg date";
+"s_order_by_creation_date" = "By creation date";
+"s_order_by_publishing_date" = "By publication date";
+"s_order_by_upload_date" = "By upload date";
 
 "s_by_date" = "By date";
 "s_registered_before" = "Registered before";
@@ -2018,16 +2056,23 @@
 "s_now_on_site" = "now on site";
 "s_with_photo" = "with photo";
 "s_only_in_names" = "only in names";
+"s_only_youtube" = "only from YouTube";
 
 "s_any" = "any";
+"s_any_single" = "any";
 "reset" = "Reset";
 
 "closed_group_post" = "This post was published in a private group";
 "deleted_target_comment" = "This comment belongs to deleted post";
 
 "no_results" = "No results";
-"s_only_performers" = "Performers only";
+"s_only_performers" = "By performers";
 "s_with_lyrics" = "With lyrics";
+
+"showing_x_y" = "(showing $1—$2)";
+"no_results_by_this_query" = "Nothing was found by this query.";
+"s_additional" = "Additional";
+"s_it_is_you" = "it is you";
 
 /* BadBrowser */
 

@@ -152,6 +152,11 @@ class Club extends RowModel
         return (bool) $this->getRecord()->hide_from_global_feed;
     }
 
+    function isHidingFromGlobalFeedEnforced(): bool
+    {
+        return (bool) $this->getRecord()->enforce_hiding_from_global_feed;
+    }
+
     function getType(): int
     {
         return $this->getRecord()->type;
@@ -432,7 +437,7 @@ class Club extends RowModel
         return (new \openvk\Web\Models\Repositories\Audios)->getClubCollectionSize($this);
     }
     
-    function toVkApiStruct(?User $user = NULL): object
+    function toVkApiStruct(?User $user = NULL, string $fields = ''): object
     {
         $res = (object) [];
 

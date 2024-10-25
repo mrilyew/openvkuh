@@ -329,13 +329,15 @@ final class UserPresenter extends OpenVKPresenter
         $user = $this->users->get((int) $this->postParam("id"));
         if(!$user) exit("Invalid state");
         
-        $user->toggleSubscription($this->user->identity);
+        if ($this->postParam("act") == "rej")
+            $user->changeFlags($this->user->identity, 0b10000000, true);
+        else
+            $user->toggleSubscription($this->user->identity);
         
-        $this->redirect($user->getURL());
+        $this->redirect($_SERVER['HTTP_REFERER']);
     }
     
-    function renderSetAvatar()
-    {
+    function renderSetAvatar() {
         $this->assertUserLoggedIn();
         $this->willExecuteWriteAction();
         
@@ -346,8 +348,8 @@ final class UserPresenter extends OpenVKPresenter
             $photo->setFile($_FILES["blob"]);
             $photo->setCreated(time());
             $photo->save();
-        } catch(ISE $ex) {
-            $this->flashFail("err", tr("error"), tr("error_upload_failed"));
+        } catch(\Throwable $ex) {
+            $this->flashFail("err", tr("error"), tr("error_upload_failed"), NULL, (int)$this->postParam("ajax", true) == 1);
         }
         
         $album = (new Albums)->getUserAvatarAlbum($this->user->identity);
@@ -358,22 +360,56 @@ final class UserPresenter extends OpenVKPresenter
         $flags = 0;
         $flags |= 0b00010000;
 
-        $post = new Post;
-        $post->setOwner($this->user->id);
-        $post->setWall($this->user->id);
-        $post->setCreated(time());
-        $post->setContent("");
-        $post->setFlags($flags);
-        $post->save();
-        $post->attach($photo);
-        if($this->postParam("ava", true) == (int)1) {
+        if($this->postParam("on_wall") == 1) {
+            $post = new Post;
+            $post->setOwner($this->user->id);
+            $post->setWall($this->user->id);
+            $post->setCreated(time());
+            $post->setContent("");
+            $post->setFlags($flags);
+            $post->save();
+
+            $post->attach($photo);
+        }
+
+        if((int)$this->postParam("ajax", true) == 1) {
             $this->returnJson([
-                "url" => $photo->getURL(),
-                "id" => $photo->getPrettyId()
+                "success"   => true,
+                "new_photo" => $photo->getPrettyId(),
+                "url"       => $photo->getURL(),
             ]);
         } else {
             $this->flashFail("succ", tr("photo_saved"), tr("photo_saved_comment"));
         }
+    }
+
+    function renderDeleteAvatar() {
+        $this->assertUserLoggedIn();
+        $this->willExecuteWriteAction();
+
+        $avatar = $this->user->identity->getAvatarPhoto();
+
+        if(!$avatar)
+            $this->flashFail("succ", tr("error"), "no avatar bro", NULL, true);
+
+        $avatar->isolate();
+
+        $newAvatar = $this->user->identity->getAvatarPhoto();
+
+        if(!$newAvatar)
+            $this->returnJson([
+                "success" => true,
+                "has_new_photo" => false,
+                "new_photo" => NULL,
+                "url"       => "/assets/packages/static/openvk/img/camera_200.png",
+            ]);
+        else
+            $this->returnJson([
+                "success" => true,
+                "has_new_photo" => true,
+                "new_photo" => $newAvatar->getPrettyId(),
+                "url"       => $newAvatar->getURL(),
+            ]);
     }
     
     function renderSettings(): void

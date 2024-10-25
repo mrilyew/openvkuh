@@ -592,6 +592,16 @@ class User extends RowModel
         return $this->_abstractRelationCount("get-followers");
     }
 
+    function getRequests(int $page = 1, int $limit = 6): \Traversable
+    {
+        return $this->_abstractRelationGenerator("get-requests", $page, $limit);
+    }
+
+    function getRequestsCount(): int
+    {
+        return $this->_abstractRelationCount("get-requests");
+    }
+
     function getSubscriptions(int $page = 1, int $limit = 6): \Traversable
     {
         return $this->_abstractRelationGenerator("get-subscriptions-user", $page, $limit);
@@ -1214,6 +1224,11 @@ class User extends RowModel
         return (bool) $this->getRecord()->activated;
     }
 
+    function isDead(): bool
+    {
+        return $this->onlineStatus() == 2;
+    }
+
     function getUnbanTime(): ?string
     {
         $ban = (new Bans)->get((int) $this->getRecord()->block_reason);
@@ -1306,9 +1321,14 @@ class User extends RowModel
         return true;
     }
 
-    function isClosed()
+    function isClosed(): bool
     {
         return (bool) $this->getProfileType();
+    }
+
+    function isHideFromGlobalFeedEnabled(): bool
+    {
+        return $this->isClosed();
     }
     
     function getRealId()
@@ -1316,7 +1336,7 @@ class User extends RowModel
         return $this->getId();
     }
 
-    function toVkApiStruct(?User $user = NULL): object
+    function toVkApiStruct(?User $user = NULL, string $fields = ''): object
     {
         $res = (object) [];
 
@@ -1328,12 +1348,21 @@ class User extends RowModel
         $res->photo_100   = $this->getAvatarURL("tiny");
         $res->photo_200   = $this->getAvatarURL("normal");
         $res->photo_id    = !is_null($this->getAvatarPhoto()) ? $this->getAvatarPhoto()->getPrettyId() : NULL;
-        # TODO: Perenesti syuda vsyo ostalnoyie
 
         $res->is_closed   = $this->isClosed();
 
-        if(!is_null($user)) {
+        if(!is_null($user))
             $res->can_access_closed  = (bool)$this->canBeViewedBy($user);
+
+        if(!is_array($fields))
+            $fields = explode(',', $fields);
+        
+        foreach($fields as $field) {
+            switch($field) {
+                case 'is_dead':
+                    $res->is_dead = $user->isDead();
+                    break;
+            }
         }
 
         return $res;
