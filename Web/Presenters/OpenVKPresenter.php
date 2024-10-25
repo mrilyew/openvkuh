@@ -198,6 +198,9 @@ abstract class OpenVKPresenter extends SimplePresenter
     {
         $user = Authenticator::i()->getUser();
 
+        if(!$this->template)
+            $this->template = new \stdClass;
+        
         $this->template->isXmas = intval(date('d')) >= 1 && date('m') == 12 || intval(date('d')) <= 15 && date('m') == 1 ? true : false;
         $this->template->isTimezoned = Session::i()->get("_timezoneOffset");
 
@@ -271,7 +274,7 @@ abstract class OpenVKPresenter extends SimplePresenter
         setlocale(LC_TIME, ...(explode(";", tr("__locale"))));
 
         if (!OPENVK_ROOT_CONF["openvk"]["preferences"]["maintenanceMode"]["all"]) {
-            if (OPENVK_ROOT_CONF["openvk"]["preferences"]["maintenanceMode"][$this->presenterName]) {
+            if ($this->presenterName && OPENVK_ROOT_CONF["openvk"]["preferences"]["maintenanceMode"][$this->presenterName]) {
                 $this->pass("openvk!Maintenance->section", $this->presenterName);
             }
         } else {
@@ -304,7 +307,7 @@ abstract class OpenVKPresenter extends SimplePresenter
             $theme = Themepacks::i()[Session::i()->get("_sessionTheme", "ovk")];
         } else if($this->requestParam("themePreview")) {
             $theme = Themepacks::i()[$this->requestParam("themePreview")];
-        } else if($this->user->identity !== NULL && $this->user->identity->getTheme()) {
+        } else if($this->user !== NULL && $this->user->identity !== NULL && $this->user->identity->getTheme()) {
             $theme = $this->user->identity->getTheme();
         }
         

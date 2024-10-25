@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 namespace openvk\VKAPI\Handlers;
 use openvk\Web\Models\Entities\User;
-use openvk\Web\Models\Entities\Notifications\{WallPostNotification, RepostNotification, CommentNotification};
+use openvk\Web\Models\Entities\Notifications\{PostAcceptedNotification, WallPostNotification, NewSuggestedPostsNotification, RepostNotification, CommentNotification};
 use openvk\Web\Models\Repositories\Users as UsersRepo;
 use openvk\Web\Models\Entities\Club;
 use openvk\Web\Models\Repositories\Clubs as ClubsRepo;
@@ -15,10 +15,12 @@ use openvk\Web\Models\Entities\Video;
 use openvk\Web\Models\Repositories\Videos as VideosRepo;
 use openvk\Web\Models\Entities\Note;
 use openvk\Web\Models\Repositories\Notes as NotesRepo;
+use openvk\Web\Models\Repositories\Polls as PollsRepo;
+use openvk\Web\Models\Repositories\Audios as AudiosRepo;
 
 final class Wall extends VKAPIRequestHandler
 {
-    function get(int $owner_id, string $domain = "", int $offset = 0, int $count = 30, int $extended = 0): object
+    function get(int $owner_id, string $domain = "", int $offset = 0, int $count = 30, int $extended = 0, string $filter = "all"): object
     {
         $this->requireUser();
 
@@ -27,7 +29,7 @@ final class Wall extends VKAPIRequestHandler
         $items    = [];
         $profiles = [];
         $groups   = [];
-        $cnt      = $posts->getPostCountOnUserWall($owner_id);
+        $cnt      = 0;
 
         if ($owner_id > 0)
             $wallOnwer = (new UsersRepo)->get($owner_id);
@@ -37,11 +39,54 @@ final class Wall extends VKAPIRequestHandler
         if ($owner_id > 0)
             if(!$wallOnwer || $wallOnwer->isDeleted())
                 $this->fail(18, "User was deleted or banned");
+
+            if(!$wallOnwer->canBeViewedBy($this->getUser()))
+                $this->fail(15, "Access denied");
         else
             if(!$wallOnwer)
                 $this->fail(15, "Access denied: wall is disabled"); // Don't search for logic here pls
 
-        foreach($posts->getPostsFromUsersWall($owner_id, 1, $count, $offset) as $post) {
+        $iteratorv;
+
+        switch($filter) {
+            case "all":
+                $iteratorv = $posts->getPostsFromUsersWall($owner_id, 1, $count, $offset);
+                $cnt       = $posts->getPostCountOnUserWall($owner_id);
+                break;
+            case "owner":
+                $iteratorv = $posts->getOwnersPostsFromWall($owner_id, 1, $count, $offset);
+                $cnt       = $posts->getOwnersCountOnUserWall($owner_id);
+                break;
+            case "others":
+                $iteratorv = $posts->getOthersPostsFromWall($owner_id, 1, $count, $offset);
+                $cnt       = $posts->getOthersCountOnUserWall($owner_id);
+                break; 
+            case "postponed":
+                $this->fail(42, "Postponed posts are not implemented.");
+                break;
+            case "suggests":
+                if($owner_id < 0) {
+                    if($wallOnwer->getWallType() != 2) 
+                        $this->fail(125, "Group's wall type is open or closed");
+
+                    if($wallOnwer->canBeModifiedBy($this->getUser())) {
+                        $iteratorv = $posts->getSuggestedPosts($owner_id * -1, 1, $count, $offset);
+                        $cnt       = $posts->getSuggestedPostsCount($owner_id * -1);
+                    } else {
+                        $iteratorv = $posts->getSuggestedPostsByUser($owner_id * -1, $this->getUser()->getId(), 1, $count, $offset);
+                        $cnt       = $posts->getSuggestedPostsCountByUser($owner_id * -1, $this->getUser()->getId());
+                    }
+                } else {
+                    $this->fail(528, "Suggested posts avaiable only at groups");
+                }
+
+                break;
+            default:
+                $this->fail(254, "Invalid filter");
+                break;
+        }
+
+        foreach($iteratorv as $post) {
             $from_id = get_class($post->getOwner()) == "openvk\Web\Models\Entities\Club" ? $post->getOwner()->getId() * (-1) : $post->getOwner()->getId();
 
             $attachments = [];
@@ -55,9 +100,14 @@ final class Wall extends VKAPIRequestHandler
                 } else if($attachment instanceof \openvk\Web\Models\Entities\Poll) {
                     $attachments[] = $this->getApiPoll($attachment, $this->getUser());
                 } else if ($attachment instanceof \openvk\Web\Models\Entities\Video) {
-                    $attachments[] = $attachment->getApiStructure();
+                    $attachments[] = $attachment->getApiStructure($this->getUser());
                 } else if ($attachment instanceof \openvk\Web\Models\Entities\Note) {
                     $attachments[] = $attachment->toVkApiStruct();
+                } else if ($attachment instanceof \openvk\Web\Models\Entities\Audio) {
+                    $attachments[] = [
+                        "type" => "audio",
+                        "audio" => $attachment->toVkApiStruct($this->getUser()),
+                    ];
                 } else if ($attachment instanceof \openvk\Web\Models\Entities\Post) {
                     $repostAttachments = [];
 
@@ -76,50 +126,44 @@ final class Wall extends VKAPIRequestHandler
                     else
                         $profiles[] = $attachment->getOwner()->getId();
 
-                    $post_source = [];
-
-                    if($attachment->getPlatform(true) === NULL) {
-                        $post_source = (object)["type" => "vk"];
-                    } else {
-                        $post_source = (object)[
-                            "type" => "api",
-                            "platform" => $attachment->getPlatform(true)
-                        ];
-                    }
-
                     $repost[] = [
                         "id" => $attachment->getVirtualId(),
                         "owner_id" => $attachment->isPostedOnBehalfOfGroup() ? $attachment->getOwner()->getId() * -1 : $attachment->getOwner()->getId(),
                         "from_id" => $attachment->isPostedOnBehalfOfGroup() ? $attachment->getOwner()->getId() * -1 : $attachment->getOwner()->getId(),
                         "date" => $attachment->getPublicationTime()->timestamp(),
-                        "post_type" => "post",
+                        "post_type" => $attachment->getVkApiType(),
                         "text" => $attachment->getText(false),
                         "attachments" => $repostAttachments,
-                        "post_source" => $post_source,
+                        "post_source" => $attachment->getPostSourceInfo(),
                     ];
+
+                    if ($attachment->getTargetWall() > 0)
+                        $profiles[] = $attachment->getTargetWall();
+                    else
+                        $groups[] = abs($attachment->getTargetWall());
+                        if($post->isSigned())
+                            $profiles[] = $attachment->getOwner()->getId();
                 }
             }
 
-            $post_source = [];
-
-            if($post->getPlatform(true) === NULL) {
-                $post_source = (object)["type" => "vk"];
-            } else {
-                $post_source = (object)[
-                    "type" => "api",
-                    "platform" => $post->getPlatform(true)
-                ];
+            $signerId = NULL;
+            if($post->isSigned()) {
+                $actualAuthor = $post->getOwner(false);
+                $signerId     = $actualAuthor->getId();
             }
 
-            $items[] = (object)[
+            # TODO "can_pin", "copy_history" и прочее не должны возвращаться, если равны null или false
+            # Ну и ещё всё надо перенести в toVkApiStruct, а то слишком много дублированного кода
+
+            $post_temp_obj = (object)[
                 "id"           => $post->getVirtualId(),
                 "from_id"      => $from_id,
                 "owner_id"     => $post->getTargetWall(),
                 "date"         => $post->getPublicationTime()->timestamp(),
-                "post_type"    => "post",
+                "post_type"    => $post->getVkApiType(),
                 "text"         => $post->getText(false),
                 "copy_history" => $repost,
-                "can_edit"     => 0, # TODO
+                "can_edit"     => $post->canBeEditedBy($this->getUser()),
                 "can_delete"   => $post->canBeDeletedBy($this->getUser()),
                 "can_pin"      => $post->canBePinnedBy($this->getUser()),
                 "can_archive"  => false, # TODO MAYBE
@@ -127,7 +171,7 @@ final class Wall extends VKAPIRequestHandler
                 "is_pinned"    => $post->isPinned(),
                 "is_explicit"  => $post->isExplicit(),
                 "attachments"  => $attachments,
-                "post_source"  => $post_source,
+                "post_source"  => $post->getPostSourceInfo(),
                 "comments"     => (object)[
                     "count"    => $post->getCommentsCount(),
                     "can_post" => 1
@@ -150,10 +194,21 @@ final class Wall extends VKAPIRequestHandler
                 ]
             ];
 
+            if($signerId) 
+                $post_temp_obj->signer_id = $signerId;
+
+            if($post->isDeactivationMessage())
+                $post_temp_obj->final_post = 1;
+
+            $items[] = $post_temp_obj;
+
             if ($from_id > 0)
                 $profiles[] = $from_id;
             else
                 $groups[]   = $from_id * -1;
+
+                if($post->isSigned())
+                    $profiles[] = $post->getOwner(false)->getId();
 
             $attachments = NULL; # free attachments so it will not clone everythingg
         }
@@ -171,9 +226,9 @@ final class Wall extends VKAPIRequestHandler
                     "first_name"        => $user->getFirstName(),
                     "id"                => $user->getId(),
                     "last_name"         => $user->getLastName(),
-                    "can_access_closed" => false,
-                    "is_closed"         => false,
-                    "sex"               => $user->isFemale() ? 1 : 2,
+                    "can_access_closed" => (bool)$user->canBeViewedBy($this->getUser()),
+                    "is_closed"         => $user->isClosed(),
+                    "sex"               => $user->isFemale() ? 1 : ($user->isNeutral() ? 0 : 2),
                     "screen_name"       => $user->getShortCode(),
                     "photo_50"          => $user->getAvatarUrl(),
                     "photo_100"         => $user->getAvatarUrl(),
@@ -226,7 +281,11 @@ final class Wall extends VKAPIRequestHandler
         foreach($psts as $pst) {
             $id   = explode("_", $pst);
             $post = (new PostsRepo)->getPostById(intval($id[0]), intval($id[1]));
+
             if($post && !$post->isDeleted()) {
+                if(!$post->canBeViewedBy($this->getUser()))
+                    continue;
+
                 $from_id = get_class($post->getOwner()) == "openvk\Web\Models\Entities\Club" ? $post->getOwner()->getId() * (-1) : $post->getOwner()->getId();
                 $attachments = [];
                 $repost = []; // чел высрал семь сигарет 😳 помянем 🕯
@@ -236,9 +295,14 @@ final class Wall extends VKAPIRequestHandler
                     } else if($attachment instanceof \openvk\Web\Models\Entities\Poll) {
                         $attachments[] = $this->getApiPoll($attachment, $user);
                     } else if ($attachment instanceof \openvk\Web\Models\Entities\Video) {
-                        $attachments[] = $attachment->getApiStructure();
+                        $attachments[] = $attachment->getApiStructure($this->getUser());
                     } else if ($attachment instanceof \openvk\Web\Models\Entities\Note) {
                         $attachments[] = $attachment->toVkApiStruct();
+                    } else if ($attachment instanceof \openvk\Web\Models\Entities\Audio) {
+                        $attachments[] = [
+                            "type" => "audio",
+                            "audio" => $attachment->toVkApiStruct($this->getUser())
+                        ];
                     } else if ($attachment instanceof \openvk\Web\Models\Entities\Post) {
                         $repostAttachments = [];
 
@@ -257,17 +321,6 @@ final class Wall extends VKAPIRequestHandler
                         else
                             $profiles[] = $attachment->getOwner()->getId();
 
-                        $post_source = [];
-
-                        if($attachment->getPlatform(true) === NULL) {
-                            $post_source = (object)["type" => "vk"];
-                        } else {
-                            $post_source = (object)[
-                                "type" => "api",
-                                "platform" => $attachment->getPlatform(true)
-                            ];
-                        }
-
                         $repost[] = [
                             "id" => $attachment->getVirtualId(),
                             "owner_id" => $attachment->isPostedOnBehalfOfGroup() ? $attachment->getOwner()->getId() * -1 : $attachment->getOwner()->getId(),
@@ -276,38 +329,39 @@ final class Wall extends VKAPIRequestHandler
                             "post_type" => "post",
                             "text" => $attachment->getText(false),
                             "attachments" => $repostAttachments,
-                            "post_source" => $post_source,
+                            "post_source" => $attachment->getPostSourceInfo(),
                         ];
+
+                        if ($attachment->getTargetWall() > 0)
+                            $profiles[] = $attachment->getTargetWall();
+                        else
+                            $groups[] = abs($attachment->getTargetWall());
+                            if($post->isSigned())
+                                $profiles[] = $attachment->getOwner()->getId();
                     }
                 }
 
-                $post_source = [];
-
-                if($post->getPlatform(true) === NULL) {
-                    $post_source = (object)["type" => "vk"];
-                } else {
-                    $post_source = (object)[
-                        "type" => "api",
-                        "platform" => $post->getPlatform(true)
-                    ];
+                if($post->isSigned()) {
+                    $actualAuthor = $post->getOwner(false);
+                    $signerId     = $actualAuthor->getId();
                 }
 
-                $items[] = (object)[
+                $post_temp_obj = (object)[
                     "id"           => $post->getVirtualId(),
                     "from_id"      => $from_id,
                     "owner_id"     => $post->getTargetWall(),
                     "date"         => $post->getPublicationTime()->timestamp(),
-                    "post_type"    => "post",
+                    "post_type"    => $post->getVkApiType(),
                     "text"         => $post->getText(false),
                     "copy_history" => $repost,
-                    "can_edit"     => 0, # TODO
+                    "can_edit"     => $post->canBeEditedBy($this->getUser()),
                     "can_delete"   => $post->canBeDeletedBy($user),
                     "can_pin"      => $post->canBePinnedBy($user),
                     "can_archive"  => false, # TODO MAYBE
                     "is_archived"  => false,
                     "is_pinned"    => $post->isPinned(),
                     "is_explicit"  => $post->isExplicit(),
-                    "post_source"  => $post_source,
+                    "post_source"  => $post->getPostSourceInfo(),
                     "attachments"  => $attachments,
                     "comments"     => (object)[
                         "count"    => $post->getCommentsCount(),
@@ -331,10 +385,21 @@ final class Wall extends VKAPIRequestHandler
                     ]
                 ];
 
+                if($signerId) 
+                    $post_temp_obj->signer_id = $signerId;
+
+                if($post->isDeactivationMessage())
+                    $post_temp_obj->final_post = 1;
+
+                $items[] = $post_temp_obj;
+
                 if ($from_id > 0)
                     $profiles[] = $from_id;
                 else
                     $groups[]   = $from_id * -1;
+
+                    if($post->isSigned())
+                        $profiles[] = $post->getOwner(false)->getId();
 
                 $attachments = NULL; # free attachments so it will not clone everything
                 $repost = NULL;      # same
@@ -350,19 +415,28 @@ final class Wall extends VKAPIRequestHandler
 
             foreach($profiles as $prof) {
                 $user                = (new UsersRepo)->get($prof);
-                $profilesFormatted[] = (object)[
-                    "first_name"        => $user->getFirstName(),
-                    "id"                => $user->getId(),
-                    "last_name"         => $user->getLastName(),
-                    "can_access_closed" => false,
-                    "is_closed"         => false,
-                    "sex"               => $user->isFemale() ? 1 : 2,
-                    "screen_name"       => $user->getShortCode(),
-                    "photo_50"          => $user->getAvatarUrl(),
-                    "photo_100"         => $user->getAvatarUrl(),
-                    "online"            => $user->isOnline(),
-                    "verified"          => $user->isVerified()
-                ];
+                if($user) {
+                    $profilesFormatted[] = (object)[
+                        "first_name"        => $user->getFirstName(),
+                        "id"                => $user->getId(),
+                        "last_name"         => $user->getLastName(),
+                        "can_access_closed" => (bool)$user->canBeViewedBy($this->getUser()),
+                        "is_closed"         => $user->isClosed(),
+                        "sex"               => $user->isFemale() ? 1 : 2,
+                        "screen_name"       => $user->getShortCode(),
+                        "photo_50"          => $user->getAvatarUrl(),
+                        "photo_100"         => $user->getAvatarUrl(),
+                        "online"            => $user->isOnline(),
+                        "verified"          => $user->isVerified()
+                    ];
+                } else {
+                    $profilesFormatted[] = (object)[
+                        "id" 		  => (int) $prof,
+                        "first_name"  => "DELETED",
+                        "last_name"   => "",
+                        "deactivated" => "deleted"
+                    ];
+                }
             }
 
             foreach($groups as $g) {
@@ -391,7 +465,7 @@ final class Wall extends VKAPIRequestHandler
             ];
     }
 
-    function post(string $owner_id, string $message = "", int $from_group = 0, int $signed = 0, string $attachments = "", string $copyright = NULL): object
+    function post(string $owner_id, string $message = "", int $from_group = 0, int $signed = 0, string $attachments = "", int $post_id = 0, string $copyright = NULL): object
     {
         $this->requireUser();
         $this->willExecuteWriteAction();
@@ -401,7 +475,7 @@ final class Wall extends VKAPIRequestHandler
         $wallOwner = ($owner_id > 0 ? (new UsersRepo)->get($owner_id) : (new ClubsRepo)->get($owner_id * -1))
                      ?? $this->fail(18, "User was deleted or banned");
         if($owner_id > 0)
-            $canPost = $wallOwner->getPrivacyPermission("wall.write", $this->getUser());
+            $canPost = $wallOwner->getPrivacyPermission("wall.write", $this->getUser()) && $wallOwner->canBeViewedBy($this->getUser());
         else if($owner_id < 0)
             if($wallOwner->canBeModifiedBy($this->getUser()))
                 $canPost = true;
@@ -411,6 +485,46 @@ final class Wall extends VKAPIRequestHandler
             $canPost = false;
 
         if($canPost == false) $this->fail(15, "Access denied");
+
+        if($post_id > 0) {
+            if($owner_id > 0)
+                $this->fail(62, "Suggested posts available only at groups");
+
+            $post = (new PostsRepo)->getPostById($owner_id, $post_id, true);
+
+            if(!$post || $post->isDeleted())
+                $this->fail(32, "Invald post");
+
+            if($post->getSuggestionType() == 0)
+                $this->fail(20, "Post is not suggested");
+
+            if($post->getSuggestionType() == 2)
+                $this->fail(16, "Post is declined");
+
+            if(!$post->canBePinnedBy($this->getUser()))
+                $this->fail(51, "Access denied");
+
+            $author = $post->getOwner();
+            $flags = 0;
+            $flags |= 0b10000000;
+
+            if($signed == 1)
+                $flags |= 0b01000000;
+
+            $post->setSuggested(0);
+            $post->setCreated(time());
+            $post->setFlags($flags);
+
+            if(!empty($message) && iconv_strlen($message) > 0)
+                $post->setContent($message);
+
+            $post->save();
+
+            if($author->getId() != $this->getUser()->getId())
+                (new PostAcceptedNotification($author, $post, $post->getWallOwner()))->emit();
+
+            return (object)["post_id" => $post->getVirtualId()];
+        }
 
         $anon = OPENVK_ROOT_CONF["openvk"]["preferences"]["wall"]["anonymousPosting"]["enable"];
         if($wallOwner instanceof Club && $from_group == 1 && $signed != 1 && $anon) {
@@ -444,12 +558,16 @@ final class Wall extends VKAPIRequestHandler
             if(!is_null($copyright) && !empty($copyright) && $copyright != "" && preg_match("/^(http:\/\/|https:\/\/)*[а-яА-ЯёЁa-z0-9\-_]+(\.[а-яА-ЯёЁa-z0-9\-_]+)+(\/\S*)*$/iu", $copyright) && iconv_strlen($copyright) < 50) {
                 $post->setSource($copyright);
             }
+          
+            if($owner_id < 0 && !$wallOwner->canBeModifiedBy($this->getUser()) && $wallOwner->getWallType() == 2)
+                $post->setSuggested(1);
 
             $post->save();
         } catch(\LogicException $ex) {
             $this->fail(100, "One of the parameters specified was missing or invalid");
         }
 
+        # TODO use parseAttachments
         if(!empty($attachments)) {
             $attachmentsArr = explode(",", $attachments);
             # Аттачи такого вида: [тип][id владельца]_[id вложения]
@@ -457,6 +575,10 @@ final class Wall extends VKAPIRequestHandler
 
             if(sizeof($attachmentsArr) > 10)
                 $this->fail(50, "Error: too many attachments");
+
+            preg_match_all("/poll/m", $attachments, $matches, PREG_SET_ORDER, 0);
+            if(sizeof($matches) > 1)
+                $this->fail(85, "Error: too many polls");
             
             foreach($attachmentsArr as $attac) {
                 $attachmentType = NULL;
@@ -467,6 +589,11 @@ final class Wall extends VKAPIRequestHandler
                     $attachmentType = "video";
                 elseif(str_contains($attac, "note"))
                     $attachmentType = "note";
+                elseif(str_contains($attac, "poll"))
+                    $attachmentType = "poll";
+                elseif(str_contains($attac, "audio"))
+                    $attachmentType = "audio";
+                
                 else
                     $this->fail(205, "Unknown attachment type");
 
@@ -501,12 +628,43 @@ final class Wall extends VKAPIRequestHandler
                         $this->fail(11, "Access to note denied");
 
                     $post->attach($attacc);
+                } elseif($attachmentType == "poll") {
+                    $attacc = (new PollsRepo)->get($attachmentId);
+
+                    if(!$attacc || $attacc->isDeleted())
+                        $this->fail(100, "Poll does not exist");
+                    if($attacc->getOwner()->getId() != $this->getUser()->getId())
+                        $this->fail(43, "You do not have access to this poll");
+
+                    $post->attach($attacc);
+                } elseif($attachmentType == "audio") {
+                    $attacc = (new AudiosRepo)->getByOwnerAndVID($attachmentOwner, $attachmentId);
+                    if(!$attacc || $attacc->isDeleted())
+                        $this->fail(100, "Audio does not exist");
+
+                    $post->attach($attacc);
                 }
             }
         }
 
         if($wall > 0 && $wall !== $this->user->identity->getId())
             (new WallPostNotification($wallOwner, $post, $this->user->identity))->emit();
+
+        if($owner_id < 0 && !$wallOwner->canBeModifiedBy($this->getUser()) && $wallOwner->getWallType() == 2) {
+            $suggsCount = (new PostsRepo)->getSuggestedPostsCount($wallOwner->getId());
+
+            if($suggsCount % 10 == 0) {
+                $managers = $wallOwner->getManagers();
+                $owner = $wallOwner->getOwner();
+                (new NewSuggestedPostsNotification($owner, $wallOwner))->emit();
+
+                foreach($managers as $manager) {
+                    (new NewSuggestedPostsNotification($manager->getUser(), $wallOwner))->emit();
+                }
+            }
+
+            return (object)["post_id" => "on_view"];
+        }
 
         return (object)["post_id" => $post->getVirtualId()];
     }
@@ -522,6 +680,9 @@ final class Wall extends VKAPIRequestHandler
         $post = (new PostsRepo)->getPostById((int) $postArray[1], (int) $postArray[2]);
         if(!$post || $post->isDeleted()) $this->fail(100, "One of the parameters specified was missing or invalid");
         
+        if(!$post->canBeViewedBy($this->getUser()))
+            $this->fail(15, "Access denied");
+
         $nPost = new Post;
         $nPost->setOwner($this->user->getId());
         
@@ -560,6 +721,9 @@ final class Wall extends VKAPIRequestHandler
 
         $post = (new PostsRepo)->getPostById($owner_id, $post_id);
         if(!$post || $post->isDeleted()) $this->fail(100, "One of the parameters specified was missing or invalid");
+        
+        if(!$post->canBeViewedBy($this->getUser()))
+            $this->fail(15, "Access denied");
 
         $comments = (new CommentsRepo)->getCommentsByTarget($post, $offset+1, $count, $sort == "desc" ? "DESC" : "ASC");
 
@@ -579,6 +743,11 @@ final class Wall extends VKAPIRequestHandler
                     $attachments[] = $this->getApiPhoto($attachment);
                 } elseif($attachment instanceof \openvk\Web\Models\Entities\Note) {
                     $attachments[] = $attachment->toVkApiStruct();
+                } elseif($attachment instanceof \openvk\Web\Models\Entities\Audio) {
+                    $attachments[] = [
+                        "type"  => "audio", 
+                        "audio" => $attachment->toVkApiStruct($this->getUser()),
+                    ];
                 }
             }
 
@@ -599,6 +768,9 @@ final class Wall extends VKAPIRequestHandler
                     "groups_can_post"   => false,
                 ]
             ];
+
+            if($comment->isFromPostAuthor($post))
+                $item['is_from_post_author'] = true;
 
             if($need_likes == true)
                 $item['likes'] = [
@@ -638,6 +810,12 @@ final class Wall extends VKAPIRequestHandler
 
         $comment = (new CommentsRepo)->get($comment_id); # один хуй айди всех комментов общий
         
+        if(!$comment || $comment->isDeleted())
+            $this->fail(100, "Invalid comment");
+    
+        if(!$comment->canBeViewedBy($this->getUser()))
+            $this->fail(15, "Access denied");
+
         $profiles = [];
 
         $attachments = [];
@@ -645,6 +823,11 @@ final class Wall extends VKAPIRequestHandler
         foreach($comment->getChildren() as $attachment) {
             if($attachment instanceof \openvk\Web\Models\Entities\Photo) {
                 $attachments[] = $this->getApiPhoto($attachment);
+            } elseif($attachment instanceof \openvk\Web\Models\Entities\Audio) {
+                $attachments[] = [
+                    "type" => "audio",
+                    "audio" => $attachment->toVkApiStruct($this->getUser()),
+                ];
             }
         }
 
@@ -672,6 +855,9 @@ final class Wall extends VKAPIRequestHandler
             ]
         ];
 
+        if($comment->isFromPostAuthor())
+            $item['is_from_post_author'] = true;
+
         if($extended == true)
             $profiles[] = $comment->getOwner()->getId();
 
@@ -687,8 +873,6 @@ final class Wall extends VKAPIRequestHandler
             $response['profiles'] = (!empty($profiles) ? (new Users)->get(implode(',', $profiles), $fields) : []);
         }
 
-
-
         return $response;
     }
 
@@ -698,6 +882,9 @@ final class Wall extends VKAPIRequestHandler
 
         $post = (new PostsRepo)->getPostById($owner_id, $post_id);
         if(!$post || $post->isDeleted()) $this->fail(100, "Invalid post");
+
+        if(!$post->canBeViewedBy($this->getUser()))
+            $this->fail(15, "Access denied");
 
         if($post->getTargetWall() < 0)
             $club = (new ClubsRepo)->get(abs($post->getTargetWall()));
@@ -736,6 +923,8 @@ final class Wall extends VKAPIRequestHandler
                     $attachmentType = "photo";
                 elseif(str_contains($attac, "video"))
                     $attachmentType = "video";
+                elseif(str_contains($attac, "audio"))
+                    $attachmentType = "audio";
                 else
                     $this->fail(205, "Unknown attachment type");
 
@@ -762,6 +951,12 @@ final class Wall extends VKAPIRequestHandler
                         $this->fail(11, "Access to video denied");
 
                     $comment->attach($attacc);
+                } elseif($attachmentType == "audio") {
+                    $attacc = (new AudiosRepo)->getByOwnerAndVID($attachmentOwner, $attachmentId);
+                    if(!$attacc || $attacc->isDeleted())
+                        $this->fail(100, "Audio does not exist");
+
+                    $comment->attach($attacc);
                 }
             }
         }
@@ -786,6 +981,119 @@ final class Wall extends VKAPIRequestHandler
             $this->fail(7, "Access denied");
 
         $comment->delete();
+
+        return 1;
+    }
+     
+    function delete(int $owner_id, int $post_id)
+    {
+        $this->requireUser();
+        $this->willExecuteWriteAction();
+
+        $post = (new PostsRepo)->getPostById($owner_id, $post_id, true);
+        if(!$post || $post->isDeleted())
+            $this->fail(583, "Invalid post");
+
+        $wallOwner = $post->getWallOwner();
+        
+        if($post->getTargetWall() < 0 && !$post->getWallOwner()->canBeModifiedBy($this->getUser()) && $post->getWallOwner()->getWallType() != 1 && $post->getSuggestionType() == 0)
+            $this->fail(12, "Access denied: you can't delete your accepted post.");
+
+        if($post->getOwnerPost() == $this->getUser()->getId() || $post->getTargetWall() == $this->getUser()->getId() || $owner_id < 0 && $wallOwner->canBeModifiedBy($this->getUser())) {
+            $post->unwire();
+            $post->delete();
+
+            return 1;
+        } else {
+            $this->fail(15, "Access denied");
+        }
+    }
+    
+    function edit(int $owner_id, int $post_id, string $message = "", string $attachments = "") {
+        $this->requireUser();
+        $this->willExecuteWriteAction();
+
+        $post = (new PostsRepo)->getPostById($owner_id, $post_id);
+
+        if(!$post || $post->isDeleted())
+            $this->fail(102, "Invalid post");
+
+        if(empty($message) && empty($attachments))
+            $this->fail(100, "Required parameter 'message' missing.");
+
+        if(!$post->canBeEditedBy($this->getUser()))
+            $this->fail(7, "Access to editing denied");
+
+        if(!empty($message))
+            $post->setContent($message);
+        
+        $post->setEdited(time());
+        $post->save(true);
+
+        # todo добавить такое в веб версию
+        if(!empty($attachments)) {
+            $attachs = parseAttachments($attachments);
+            $newAttachmentsCount = sizeof($attachs);
+
+            $postsAttachments = iterator_to_array($post->getChildren());
+
+            if(sizeof($postsAttachments) >= 10)
+                $this->fail(15, "Post have too many attachments");
+
+            if(($newAttachmentsCount + sizeof($postsAttachments)) > 10)
+                $this->fail(158, "Post will have too many attachments");
+
+            foreach($attachs as $attach) {
+                if($attach && !$attach->isDeleted())
+                    $post->attach($attach);
+                else
+                    $this->fail(52, "One of the attachments is invalid");
+            }
+        }
+
+        return ["post_id" => $post->getVirtualId()];
+    }
+
+    function editComment(int $comment_id, int $owner_id = 0, string $message = "", string $attachments = "") {
+        $this->requireUser();
+        $this->willExecuteWriteAction();
+
+        $comment = (new CommentsRepo)->get($comment_id);
+
+        if(empty($message) && empty($attachments))
+            $this->fail(100, "Required parameter 'message' missing.");
+
+        if(!$comment || $comment->isDeleted())
+            $this->fail(102, "Invalid comment");
+
+        if(!$comment->canBeEditedBy($this->getUser()))
+            $this->fail(15, "Access to editing comment denied");
+        
+        if(!empty($message))
+            $comment->setContent($message);
+        
+        $comment->setEdited(time());
+        $comment->save(true);
+        
+        if(!empty($attachments)) {
+            $attachs = parseAttachments($attachments);
+            $newAttachmentsCount = sizeof($attachs);
+
+            $postsAttachments = iterator_to_array($comment->getChildren());
+
+            if(sizeof($postsAttachments) >= 10)
+                $this->fail(15, "Post have too many attachments");
+
+            if(($newAttachmentsCount + sizeof($postsAttachments)) > 10)
+                $this->fail(158, "Post will have too many attachments");
+
+            foreach($attachs as $attach) {
+                if($attach && !$attach->isDeleted())
+                    $comment->attach($attach);
+                else
+                    $this->fail(52, "One of the attachments is invalid");
+            }
+        }
 
         return 1;
     }
@@ -842,7 +1150,7 @@ final class Wall extends VKAPIRequestHandler
         return [
             "type"  => "photo",
             "photo" => [
-                "album_id" => $attachment->getAlbum() ? $attachment->getAlbum()->getId() : NULL,
+                "album_id" => $attachment->getAlbum() ? $attachment->getAlbum()->getId() : 0,
                 "date"     => $attachment->getPublicationTime()->timestamp(),
                 "id"       => $attachment->getVirtualId(),
                 "owner_id" => $attachment->getOwner()->getId(),

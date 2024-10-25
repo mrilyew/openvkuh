@@ -5,7 +5,7 @@ use openvk\Web\Util\Sms;
 use openvk\Web\Themes\Themepacks;
 use openvk\Web\Models\Entities\{Photo, Post, EmailChangeVerification};
 use openvk\Web\Models\Entities\Notifications\{CoinsTransferNotification, RatingUpNotification};
-use openvk\Web\Models\Repositories\{Users, Clubs, Albums, Videos, Notes, Vouchers, EmailChangeVerifications};
+use openvk\Web\Models\Repositories\{Users, Clubs, Albums, Videos, Notes, Vouchers, EmailChangeVerifications, Audios};
 use openvk\Web\Models\Exceptions\InvalidUserNameException;
 use openvk\Web\Util\Validator;
 use Chandler\Security\Authenticator;
@@ -29,9 +29,13 @@ final class UserPresenter extends OpenVKPresenter
     function renderView(int $id): void
     {
         $user = $this->users->get($id);
-        if(!$user || $user->isDeleted()) {
+        if(!$user || $user->isDeleted() || !$user->canBeViewedBy($this->user->identity)) {
             if(!is_null($user) && $user->isDeactivated()) {
                 $this->template->_template = "User/deactivated.xml";
+                
+                $this->template->user = $user;
+            } else if(!$user->canBeViewedBy($this->user->identity)) {
+                $this->template->_template = "User/private.xml";
                 
                 $this->template->user = $user;
             } else {
@@ -45,7 +49,10 @@ final class UserPresenter extends OpenVKPresenter
             $this->template->videosCount = (new Videos)->getUserVideosCount($user);
             $this->template->notes       = (new Notes)->getUserNotes($user, 1, 4);
             $this->template->notesCount  = (new Notes)->getUserNotesCount($user);
-            
+            $this->template->audios      = (new Audios)->getRandomThreeAudiosByEntityId($user->getId());
+            $this->template->audiosCount = (new Audios)->getUserCollectionSize($user);
+            $this->template->audioStatus = $user->getCurrentAudioStatus();
+
             $this->template->user = $user;
         }
     }
@@ -55,7 +62,7 @@ final class UserPresenter extends OpenVKPresenter
         $this->assertUserLoggedIn();
         
         $user = $this->users->get($id);
-        $page = abs($this->queryParam("p") ?? 1);
+        $page = abs((int)($this->queryParam("p") ?? 1));
         if(!$user)
             $this->notFound();
         elseif (!$user->getPrivacyPermission('friends.read', $this->user->identity ?? NULL))
@@ -163,12 +170,36 @@ final class UserPresenter extends OpenVKPresenter
 
                 if ($this->postParam("marialstatus") <= 8 && $this->postParam("marialstatus") >= 0)
                 $user->setMarital_Status($this->postParam("marialstatus"));
+
+                if ($this->postParam("maritalstatus-user")) {
+                    if (in_array((int) $this->postParam("marialstatus"), [0, 1, 8])) {
+                        $user->setMarital_Status_User(NULL);
+                    } else {
+                        $mUser = (new Users)->getByAddress($this->postParam("maritalstatus-user"));
+                        if ($mUser) {
+                            if ($mUser->getId() !== $this->user->id) {
+                                $user->setMarital_Status_User($mUser->getId());
+                            }
+                        }
+                    }
+                }
                 
                 if ($this->postParam("politViews") <= 9 && $this->postParam("politViews") >= 0)
                 $user->setPolit_Views($this->postParam("politViews"));
                 
-                if ($this->postParam("gender") <= 1 && $this->postParam("gender") >= 0)
-                $user->setSex($this->postParam("gender"));
+                if ($this->postParam("pronouns") <= 2 && $this->postParam("pronouns") >= 0)
+                switch ($this->postParam("pronouns")) {
+                    case '0':
+                        $user->setSex(0);
+                        break;
+                    case '1':
+                        $user->setSex(1);
+                        break;
+                    case '2':
+                        $user->setSex(2);
+                        break;
+                }
+                $user->setAudio_broadcast_enabled($this->checkbox("broadcast_music"));
                 
                 if(!empty($this->postParam("phone")) && $this->postParam("phone") !== $user->getPhone()) {
                     if(!OPENVK_ROOT_CONF["openvk"]["credentials"]["smsc"]["enable"])
@@ -241,6 +272,7 @@ final class UserPresenter extends OpenVKPresenter
                 }
 
                 $user->setStatus(empty($this->postParam("status")) ? NULL : $this->postParam("status"));
+                $user->setAudio_broadcast_enabled($this->postParam("broadcast") == 1);
                 $user->save();
 
                 $this->returnJson([
@@ -297,13 +329,15 @@ final class UserPresenter extends OpenVKPresenter
         $user = $this->users->get((int) $this->postParam("id"));
         if(!$user) exit("Invalid state");
         
-        $user->toggleSubscription($this->user->identity);
+        if ($this->postParam("act") == "rej")
+            $user->changeFlags($this->user->identity, 0b10000000, true);
+        else
+            $user->toggleSubscription($this->user->identity);
         
-        $this->redirect($user->getURL());
+        $this->redirect($_SERVER['HTTP_REFERER']);
     }
     
-    function renderSetAvatar()
-    {
+    function renderSetAvatar() {
         $this->assertUserLoggedIn();
         $this->willExecuteWriteAction();
         
@@ -314,8 +348,8 @@ final class UserPresenter extends OpenVKPresenter
             $photo->setFile($_FILES["blob"]);
             $photo->setCreated(time());
             $photo->save();
-        } catch(ISE $ex) {
-            $this->flashFail("err", tr("error"), tr("error_upload_failed"));
+        } catch(\Throwable $ex) {
+            $this->flashFail("err", tr("error"), tr("error_upload_failed"), NULL, (int)$this->postParam("ajax", true) == 1);
         }
         
         $album = (new Albums)->getUserAvatarAlbum($this->user->identity);
@@ -326,22 +360,56 @@ final class UserPresenter extends OpenVKPresenter
         $flags = 0;
         $flags |= 0b00010000;
 
-        $post = new Post;
-        $post->setOwner($this->user->id);
-        $post->setWall($this->user->id);
-        $post->setCreated(time());
-        $post->setContent("");
-        $post->setFlags($flags);
-        $post->save();
-        $post->attach($photo);
-        if($this->postParam("ava", true) == (int)1) {
+        if($this->postParam("on_wall") == 1) {
+            $post = new Post;
+            $post->setOwner($this->user->id);
+            $post->setWall($this->user->id);
+            $post->setCreated(time());
+            $post->setContent("");
+            $post->setFlags($flags);
+            $post->save();
+
+            $post->attach($photo);
+        }
+
+        if((int)$this->postParam("ajax", true) == 1) {
             $this->returnJson([
-                "url" => $photo->getURL(),
-                "id" => $photo->getPrettyId()
+                "success"   => true,
+                "new_photo" => $photo->getPrettyId(),
+                "url"       => $photo->getURL(),
             ]);
         } else {
             $this->flashFail("succ", tr("photo_saved"), tr("photo_saved_comment"));
         }
+    }
+
+    function renderDeleteAvatar() {
+        $this->assertUserLoggedIn();
+        $this->willExecuteWriteAction();
+
+        $avatar = $this->user->identity->getAvatarPhoto();
+
+        if(!$avatar)
+            $this->flashFail("succ", tr("error"), "no avatar bro", NULL, true);
+
+        $avatar->isolate();
+
+        $newAvatar = $this->user->identity->getAvatarPhoto();
+
+        if(!$newAvatar)
+            $this->returnJson([
+                "success" => true,
+                "has_new_photo" => false,
+                "new_photo" => NULL,
+                "url"       => "/assets/packages/static/openvk/img/camera_200.png",
+            ]);
+        else
+            $this->returnJson([
+                "success" => true,
+                "has_new_photo" => true,
+                "new_photo" => $newAvatar->getPrettyId(),
+                "url"       => $newAvatar->getURL(),
+            ]);
     }
     
     function renderSettings(): void
@@ -430,11 +498,16 @@ final class UserPresenter extends OpenVKPresenter
                     "friends.add",
                     "wall.write",
                     "messages.write",
+                    "audios.read",
                 ];
                 foreach($settings as $setting) {
                     $input = $this->postParam(str_replace(".", "_", $setting));
-                    $user->setPrivacySetting($setting, min(3, abs($input ?? $user->getPrivacySetting($setting))));
+                    $user->setPrivacySetting($setting, min(3, (int)abs((int)$input ?? $user->getPrivacySetting($setting))));
                 }
+
+                $prof = $this->postParam("profile_type") == 1 || $this->postParam("profile_type") == 0 ? (int)$this->postParam("profile_type") : 0;
+                $user->setProfile_type($prof);
+                
             } else if($_GET['act'] === "finance.top-up") {
                 $token   = $this->postParam("key0") . $this->postParam("key1") . $this->postParam("key2") . $this->postParam("key3");
                 $voucher = (new Vouchers)->getByToken($token);
@@ -474,6 +547,7 @@ final class UserPresenter extends OpenVKPresenter
             } else if($_GET['act'] === "lMenu") {
                 $settings = [
                     "menu_bildoj"    => "photos",
+                    "menu_muziko"    => "audios",
                     "menu_filmetoj"  => "videos",
                     "menu_mesagoj"   => "messages",
                     "menu_notatoj"   => "notes",

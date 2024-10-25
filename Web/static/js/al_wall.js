@@ -22,6 +22,31 @@ function trim(string) {
     return newStr;
 }
 
+function trimNum(string, num) {
+    var newStr = string.substring(0, num);
+    if(newStr.length !== string.length)
+        newStr += "…";
+
+    return newStr;
+}
+
+function handleUpload(id) {
+    console.warn("блять...");
+    
+    u("#post-buttons" + id + " .postFileSel").not("#" + this.id).each(input => input.value = null);
+    
+    var indicator = u("#post-buttons" + id + " .post-upload");
+    var file      = this.files[0];
+    if(typeof file === "undefined") {
+        indicator.attr("style", "display: none;");
+    } else {
+        u("span", indicator.nodes[0]).text(trim(file.name) + " (" + humanFileSize(file.size, false) + ")");
+        indicator.attr("style", "display: block;");
+    }
+
+    document.querySelector("#post-buttons" + id + " #wallAttachmentMenu").classList.add("hidden");
+}
+
 function initGraffiti(id) {
     let canvas = null;
     let msgbox = MessageBox(tr("draw_graffiti"), "<div id='ovkDraw'></div>", [tr("save"), tr("cancel")], [function() {
@@ -125,7 +150,7 @@ function appendImage(response, textareaId) {
     u(`#post-buttons${textareaId} .upload #loader`).remove()
 }
 
-u(".post-like-button").on("click", function(e) {
+$(document).on("click", ".post-like-button", function(e) {
     e.preventDefault();
     
     var thisBtn = u(this).first();
@@ -155,18 +180,6 @@ function setupWallPostInputHandlers(id) {
             return;
         }
     });
-    
-    u("#wall-post-input" + id).on("input", function(e) {
-        var boost             = 5;
-        var textArea          = e.target;
-        textArea.style.height = "5px";
-        var newHeight = textArea.scrollHeight;
-        textArea.style.height = newHeight + boost + "px";
-        return;
-        
-        // revert to original size if it is larger (possibly changed by user)
-        // textArea.style.height = (newHeight > originalHeight ? (newHeight + boost) : originalHeight) + "px";
-    });
 
     u("#wall-post-input" + id).on("dragover", function(e) {
         e.preventDefault()
@@ -181,6 +194,18 @@ function setupWallPostInputHandlers(id) {
         return;
     });
 }
+
+u(document).on("input", "textarea", function(e) {
+    var boost             = 5;
+    var textArea          = e.target;
+    textArea.style.height = "5px";
+    var newHeight = textArea.scrollHeight;
+    textArea.style.height = newHeight + boost + "px";
+    return;
+    
+    // revert to original size if it is larger (possibly changed by user)
+    // textArea.style.height = (newHeight > originalHeight ? (newHeight + boost) : originalHeight) + "px";
+});
 
 function OpenMiniature(e, photo, post, photo_id, type = "post") {
     /*
@@ -210,7 +235,7 @@ function OpenMiniature(e, photo, post, photo_id, type = "post") {
                     <a id="ovk-photo-close">${tr("close")}</a>
                 </div>
             </div>
-            <center style="margin-bottom: 8pt;">
+            <center style="margin-bottom: 8pt; position: relative;">
                 <div class="ovk-photo-slide-left"></div>
                 <div class="ovk-photo-slide-right"></div>
                 <img src="${photo}" style="max-width: 100%; max-height: 60vh; user-select:none;" id="ovk-photo-img">
@@ -254,7 +279,7 @@ function OpenMiniature(e, photo, post, photo_id, type = "post") {
                             tempDetailsSection[index] = element.innerHTML;
 
                             if(index == imagesIndex) {
-                                u(".ovk-photo-details").last().innerHTML = element.innerHTML;
+                                u(".ovk-photo-details").last().innerHTML = element.innerHTML ?? '';
                             }
 
                             document.querySelectorAll(".ovk-photo-details .bsdn").forEach(bsdnInitElement)
@@ -317,31 +342,38 @@ function OpenMiniature(e, photo, post, photo_id, type = "post") {
 
     let data = new FormData()
     data.append('parentType', type);
-    ky.post("/iapi/getPhotosFromPost/" + (type == "post" ? post : "1_"+post), {
-        hooks: {
-            afterResponse: [
-                async (_request, _options, response) => {
-                    json = await response.json();
-
-                    imagesCount = json.body.length;
-                    imagesIndex = 0;
-                    // Это всё придётся правда на 1 прибавлять
-                    
-                    json.body.every(element => {
-                        imagesIndex++;
-                        if(element.id == photo_id) {
-                            return false;
-                        } else {
-                            return true;
-                        }
-                    });
-
-                    __reloadTitleBar();
-                    __loadDetails(json.body[imagesIndex - 1].id, imagesIndex);                }
-            ]
-        },
-        body: data
-    });
+    
+    if(type) {
+        ky.post("/iapi/getPhotosFromPost/" + (type == "post" ? post : "1_"+post), {
+            hooks: {
+                afterResponse: [
+                    async (_request, _options, response) => {
+                        json = await response.json();
+    
+                        imagesCount = json.body.length;
+                        imagesIndex = 0;
+                        // Это всё придётся правда на 1 прибавлять
+                        
+                        json.body.every(element => {
+                            imagesIndex++;
+                            if(element.id == photo_id) {
+                                return false;
+                            } else {
+                                return true;
+                            }
+                        });
+    
+                        __reloadTitleBar();
+                        __loadDetails(json.body[imagesIndex - 1].id, imagesIndex);                }
+                ]
+            },
+            body: data
+        });
+    } else {
+        imagesCount = 1
+        __reloadTitleBar()
+        __loadDetails(photo_id, imagesIndex)
+    }
 
     return u(".ovk-photo-view-dimmer");
 }
@@ -420,7 +452,7 @@ tippy(".client_app", {
 function addNote(textareaId, nid)
 {
     if(nid > 0) {
-        note.value = nid
+        document.getElementById("note").value = nid
         let noteObj = document.querySelector("#nd"+nid)
     
         let nortd = document.querySelector("#post-buttons"+textareaId+" .post-has-note");
@@ -428,7 +460,7 @@ function addNote(textareaId, nid)
     
         nortd.innerHTML = `${tr("note")} ${escapeHtml(noteObj.dataset.name)}`
     } else {
-        note.value = "none"
+        document.getElementById("note").value = "none"
 
         let nortd = document.querySelector("#post-buttons"+textareaId+" .post-has-note");
         nortd.style.display = "none"
@@ -456,7 +488,7 @@ async function attachNote(id)
                 ${tr("select_or_create_new")}
                 <div id="notesList">`
 
-            if(note.value != "none") {
+            if(document.getElementById("note").value != "none") {
                 body += `
                 <div class="ntSelect" onclick="addNote(${id}, 0)">
                     <span>${tr("do_not_attach_note")}</span>
@@ -504,6 +536,395 @@ $(document).on("change", "input[name='set_source']", (e) => {
     } else {
         document.getElementById("sourceSet").style.display = "none"
         e.currentTarget.parentNode.querySelector("span").innerHTML = tr("set_source")
+      
+    }
+})
+
+// Оконный плеер
+
+$(document).on("click", "#videoOpen", async (e) => {
+    e.preventDefault()
+
+    document.getElementById("ajloader").style.display = "block"
+
+    if(document.querySelector(".ovk-fullscreen-dimmer") != null) {
+        u(".ovk-fullscreen-dimmer").remove()
+    }
+
+    let target   = e.currentTarget
+    let videoId  = target.dataset.id
+    let videoObj = null;
+
+    try {
+        videoObj = await API.Video.getVideo(Number(videoId))
+    } catch(e) {
+        console.error(e)
+        document.getElementById("ajloader").style.display = "none"
+        MessageBox(tr("error"), tr("video_access_denied"), [tr("cancel")], [
+        function() {
+            Function.noop
+        }]);
+        return 0;
+    }
+
+    document.querySelector("html").style.overflowY = "hidden"
+
+    let player = null;
+
+    if(target.dataset.dontload == null) {
+        document.querySelectorAll("video").forEach(vid => vid.pause())
+        if(videoObj.type == 0) {
+            if(videoObj.isProcessing) {
+                player = `
+                    <span class="gray">${tr("video_processing")}</span>
+                `
+            } else {
+                player = `
+                <div class="bsdn media" data-name="${escapeHtml(videoObj.title)}" data-author="${escapeHtml(videoObj.name)}">
+                    <video class="media" src="${videoObj.url}"></video>
+                </div>`
+            }
+        } else {
+            player = videoObj.embed
+        }
+    } else {
+        player = ``
+    }
+
+
+    let dialog = u(
+        `
+        <div class="ovk-fullscreen-dimmer">
+            <div class="ovk-fullscreen-player">
+                ${videoObj.prevVideo != null ?
+                `<div class="right-arrow" id="videoOpen" data-id="${videoObj.prevVideo}">
+                    <img src="/assets/packages/static/openvk/img/right_arr.png" draggable="false">
+                </div>` : ""}
+                ${videoObj.nextVideo != null ? `
+                <div class="left-arrow" id="videoOpen" data-id="${videoObj.nextVideo}" style="margin-left: 820px;">
+                    <img src="/assets/packages/static/openvk/img/left_arr.png" draggable="false">
+                </div>` : ""}
+                <div class="inner-player">
+                    <div class="top-part">
+                        <span class="top-part-name">${escapeHtml(videoObj.title)}</span>
+                        <div class="top-part-buttons">
+                            <span class="clickable" id="minimizePlayer" data-name="${escapeHtml(videoObj.title)}" data-id="${videoObj.id}">${tr("hide_player")}</span>
+                            <span>|</span>
+                            <span class="clickable" id="closeFplayer">${tr("close_player")}</span>
+                        </div>
+                        <div class="top-part-player-subdiv">
+                            ${target.dataset.dontload == null ?`
+                            <div class="fplayer">
+                                ${player}
+                            </div>` : ""}
+                        </div>
+                        <div class="top-part-bottom-buttons">
+                            <span class="clickable" id="showComments" data-id="${videoObj.id}" data-owner="${videoObj.owner}" data-pid="${videoObj.pretty_id}">${tr("show_comments")}</span>
+                            <span>|</span>
+                            <span class="clickable" id="gotopage" data-id="/video${videoObj.pretty_id}">${tr("to_page")}</span>
+                            ${ videoObj.type == 0 && videoObj.isProcessing == false ? `<span>|</span>
+                            <a class="clickable" href="${videoObj.url}" download><span class="clickable">${tr("download_video")}</span></a>` : ""}
+                        </div>
+                    </div>
+                </div>
+                <div class="bottom-part">
+                    <div class="left_block">
+                        <div class="description" style="margin-bottom: 5px;">
+                            <span>${videoObj.description != null ? escapeHtml(videoObj.description) : "(" + tr("no_description") + ")"}</span>
+                        </div>
+                        <div class="bottom-part-info" style="display: flex;">
+                            <span class="gray">${tr("added")} ${videoObj.published}&nbsp;</span><span>|</span>
+                            <div class="like_wrap" style="float:unset;">
+                                <a href="/video${videoObj.pretty_id}/like?hash=${encodeURIComponent(u("meta[name=csrf]").attr("value"))}" class="post-like-button" data-liked="${videoObj.has_like ? 1 : 0}" data-likes="${videoObj.likes}">
+                                    <div class="heart" id="${videoObj.has_like ? "liked" : ""}"></div>
+                                    <span class="likeCnt" style="margin-top: -2px;">${videoObj.likes > 0 ? videoObj.likes : ""}</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div id="vidComments"></div>
+                    </div>
+                    <div class="right_block">
+                        <div class="views">
+                            <!--prosmoters are not implemented((-->
+                            <span class="gray">${tr("x_views", 0)}</span>
+                        </div>
+                        
+                        <div class="v_author">
+                            <span class="gray">${tr("video_author")}:</span><br>
+                            <a href="/id${videoObj.owner}"><span style="color:unset;">${videoObj.author}</span></a>
+                        </div>
+                        <div class="actions" style="margin-top: 10px;margin-left: -3px;">
+                        ${videoObj.canBeEdited ? `
+                            <a href="/video${videoObj.pretty_id}/edit" class="profile_link" style="display:block;width:96%;font-size: 13px;">
+                                ${tr("edit")}
+                            </a>
+                            <a href="/video${videoObj.pretty_id}/remove" class="profile_link" style="display:block;width:96%;font-size: 13px;">
+                                ${tr("delete")}
+                            </a>`
+                         : ""}
+                            <a id="shareVideo" class="profile_link" id="shareVideo" data-owner="${videoObj.owner}" data-vid="${videoObj.virtual_id}" style="display:block;width:96%;font-size: 13px;">
+                                ${tr("share")}
+                            </a>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>`);
+
+    u("body").addClass("dimmed").append(dialog);
+
+    if(target.dataset.dontload != null) {
+        let oldPlayer = document.querySelector(".miniplayer-video .fplayer")
+        let newPlayer = document.querySelector(".top-part-player-subdiv")
+
+        newPlayer.append(oldPlayer)
+    }
+
+    if(videoObj.type == 0 && videoObj.isProcessing == false) {
+        bsdnInitElement(document.querySelector(".fplayer .bsdn"))
+    }
+
+    document.getElementById("ajloader").style.display = "none"
+    u(".miniplayer").remove()
+})
+
+$(document).on("click", "#closeFplayer", async (e) => {
+    u(".ovk-fullscreen-dimmer").remove();
+    document.querySelector("html").style.overflowY = "scroll"
+    u("body").removeClass("dimmed")
+})
+
+$(document).on("click", "#minimizePlayer", async (e) => {
+    let targ = e.currentTarget
+
+    let player    = document.querySelector(".fplayer")
+
+    let dialog = u(`
+        <div class="miniplayer">
+            <span class="miniplayer-name">${escapeHtml(trimNum(targ.dataset.name, 26))}</span>
+            <div class="miniplayer-actions">
+                <img src="/assets/packages/static/openvk/img/miniplayer_open.png" id="videoOpen" data-dontload="true" data-id="${targ.dataset.id}">
+                <img src="/assets/packages/static/openvk/img/miniplayer_close.png" id="closeMiniplayer">
+            </div>
+            <div class="miniplayer-video">
+            
+            </div>
+        </div>
+    `);
+
+    u("body").append(dialog);
+    $('.miniplayer').draggable({cursor: "grabbing", containment: "body", cancel: ".miniplayer-video"});
+
+    let newPlayer = document.querySelector(".miniplayer-video")
+    newPlayer.append(player)
+
+    document.querySelector(".miniplayer").style.top = window.scrollY;
+    document.querySelector("#closeFplayer").click()
+})
+
+$(document).on("click", "#closeMiniplayer", async (e) => {
+    u(".miniplayer").remove()
+})
+
+$(document).on("mouseup", "#gotopage", async (e) => {
+    if(e.originalEvent.which === 1) {
+        location.href = e.currentTarget.dataset.id
+    } else if (e.originalEvent.which === 2) { 
+        window.open(e.currentTarget.dataset.id, '_blank')
+    }
+
+})
+
+$(document).keydown(function(e) {
+    if(document.querySelector(".top-part-player-subdiv .bsdn") != null && document.activeElement.tagName == "BODY") {
+        let video = document.querySelector(".top-part-player-subdiv video")
+
+        switch(e.keyCode) {
+            // Пробел вроде
+            case 32:
+                document.querySelector(".top-part-player-subdiv .bsdn_teaserButton").click()
+                break
+            // Стрелка вниз, уменьшение громкости
+            case 40:
+                oldVolume = video.volume
+
+                if(oldVolume - 0.1 > 0) {
+                    video.volume = oldVolume - 0.1
+                } else {
+                    video.volume = 0
+                }
+
+                break;
+            // Стрелка вверх, повышение громкости
+            case 38:
+                oldVolume = video.volume
+
+                if(oldVolume + 0.1 < 1) {
+                    video.volume = oldVolume + 0.1
+                } else {
+                    video.volume = 1
+                }
+
+                break
+            // стрелка влево, отступ на 2 секунды назад
+            case 37:
+                oldTime = video.currentTime
+                video.currentTime = oldTime - 2
+                break
+            // стрелка вправо, отступ на 2 секунды вперёд
+            case 39:
+                oldTime = document.querySelector(".top-part-player-subdiv video").currentTime
+                document.querySelector(".top-part-player-subdiv video").currentTime = oldTime + 2
+                break
+        }
+    }
+});
+
+$(document).keyup(function(e) {
+    if(document.querySelector(".top-part-player-subdiv .bsdn") != null && document.activeElement.tagName == "BODY") {
+        let video = document.querySelector(".top-part-player-subdiv video")
+
+        switch(e.keyCode) {
+            // Escape, закрытие плеера
+            case 27:
+                document.querySelector("#closeFplayer").click()
+                break
+            // Блять, я перепутал лево и право, пиздец я долбаёб конечно
+            // Ну короче стрелка влево
+            case 65:
+                if(document.querySelector(".right-arrow") != null) {
+                    document.querySelector(".right-arrow").click()
+                } else {
+                    console.info("No left arrow bro")
+                }
+                break
+            // Фуллскрин
+            case 70:
+                document.querySelector(".top-part-player-subdiv .bsdn_fullScreenButton").click()
+                break
+            // стрелка вправо
+            case 68:
+                if(document.querySelector(".left-arrow") != null) {
+                    document.querySelector(".left-arrow").click()
+                } else {
+                    console.info("No right arrow bro")
+                }
+                break;
+            // S: Показать инфо о видео (не комментарии)
+            case 83:
+                document.querySelector(".top-part-player-subdiv #showComments").click()
+                break
+            // Мут (M)
+            case 77:
+                document.querySelector(".top-part-player-subdiv .bsdn_soundIcon").click()
+                break;
+            // Escape, выход из плеера
+            case 192:
+                document.querySelector(".top-part-buttons #minimizePlayer").click()
+                break
+            // Бля не помню сори
+            case 75:
+                document.querySelector(".top-part-player-subdiv .bsdn_playButton").click()
+                break
+            // Home, переход в начало видосика
+            case 36:
+                video.currentTime = 0
+                break
+            // End, переход в конец видосика
+            case 35:
+                video.currentTime = video.duration
+                break;
+        }
+    }
+});
+
+$(document).on("click", "#showComments", async (e) => {
+    if(document.querySelector(".bottom-part").style.display == "none" || document.querySelector(".bottom-part").style.display == "") {
+        if(document.getElementById("vidComments").innerHTML == "") {
+            let xhr = new XMLHttpRequest
+            xhr.open("GET", "/video"+e.currentTarget.dataset.pid)
+            xhr.onloadstart = () => {
+                document.getElementById("vidComments").innerHTML = `<img src="/assets/packages/static/openvk/img/loading_mini.gif">`
+            }
+
+            xhr.timeout = 10000;
+
+            xhr.onload = () => {
+                let parser = new DOMParser();
+                let body   = parser.parseFromString(xhr.responseText, "text/html");
+                let comms  = body.getElementById("comments")
+                let commsHTML = comms.innerHTML.replace("expand_wall_textarea(11)", "expand_wall_textarea(999)")
+                                                .replace("wall-post-input11", "wall-post-input999")
+                                                .replace("post-buttons11", "post-buttons999")
+                                                .replace("toggleMenu(11)", "toggleMenu(999)")
+                                                .replace("toggleMenu(11)", "toggleMenu(999)")
+                                                .replace(/ons11/g, "ons999")
+                document.getElementById("vidComments").innerHTML = commsHTML
+            }
+
+            xhr.onerror = () => {
+                document.getElementById("vidComments").innerHTML = `<span>${tr("comments_load_timeout")}</span>`
+            }
+
+            xhr.ontimeout = () => {
+                document.getElementById("vidComments").innerHTML = `<span>${tr("comments_load_timeout")}</span>`
+            };
+
+            xhr.send()
+        }
+
+        document.querySelector(".bottom-part").style.display = "flex"
+        e.currentTarget.innerHTML = tr("close_comments")
+    } else {
+        document.querySelector(".bottom-part").style.display = "none"
+        e.currentTarget.innerHTML = tr("show_comments")
+    }
+})
+
+$(document).on("click", "#shareVideo", async (e) => {
+    let owner_id   = e.currentTarget.dataset.owner
+    let virtual_id = e.currentTarget.dataset.vid
+    let body = `
+        <b>${tr('auditory')}:</b> <br/>
+        <input type="radio" name="type" onchange="signs.setAttribute('hidden', 'hidden');document.getElementById('groupId').setAttribute('hidden', 'hidden')" value="0" checked>${tr("in_wall")}<br/>
+        <input type="radio" name="type" onchange="signs.removeAttribute('hidden');document.getElementById('groupId').removeAttribute('hidden')" value="1" id="group">${tr("in_group")}<br/>
+        <select style="width:50%;" id="groupId" name="groupId" hidden>
+        </select><br/>
+        <b>${tr('your_comment')}:</b> 
+        <textarea id='uRepostMsgInput'></textarea>
+        <div id="signs" hidden>
+        <label><input onchange="signed.checked ? signed.checked = false : null" type="checkbox" id="asgroup" name="asGroup">${tr('post_as_group')}</label><br>
+        <label><input onchange="asgroup.checked = true" type="checkbox" id="signed" name="signed">${tr('add_signature')}</label>
+        </div>
+    `
+    MessageBox(tr("share_video"), body, [tr("share"), tr("cancel")], [
+        (async function() {
+            let type   = $('input[name=type]:checked').val()
+            let club   = document.getElementById("groupId").value
+
+            let asGroup = document.getElementById("asgroup").checked
+            let signed  = document.getElementById("signed").checked
+
+            let repost = null;
+
+            try {
+                repost = await API.Video.shareVideo(Number(owner_id), Number(virtual_id), Number(type), uRepostMsgInput.value, Number(club), signed, asGroup)
+                NewNotification(tr('information_-1'), tr('shared_succ_video'), null, () => {window.location.href = "/wall" + repost.pretty_id});
+            } catch(e) {
+                console.log("tudu")
+            }
+        }), (function() {
+                Function.noop
+        })], false);
+
+    try {
+        clubs = await API.Groups.getWriteableClubs();
+        for(const el of clubs) {
+            document.getElementById("groupId").insertAdjacentHTML("beforeend", `<option value="${el.id}">${escapeHtml(el.name)}</option>`)
+        }
+    } catch(rejection) {
+        console.error(rejection)
+        document.getElementById("group").setAttribute("disabled", "disabled")
     }
 })
 
@@ -974,4 +1395,266 @@ $(document).on("click", "#photosAttachments", async (e) => {
         
         xhr.send(formdata)
     })
+})
+
+$(document).on("click", "#add_image", (e) => {
+    let isGroup = e.currentTarget.closest(".avatar_block").dataset.club != null
+    let group = isGroup ? e.currentTarget.closest(".avatar_block").dataset.club : 0
+
+    let body = `
+    <div id="avatarUpload">
+        <p>${isGroup == true ? tr('groups_avatar') : tr('friends_avatar')}</p>
+        <p>${tr('formats_avatar')}</p><br>
+
+        <label class="button" style="margin-left:45%;user-select:none" id="uploadbtn">
+            ${tr("browse")}
+            <input accept="image/*" type="file" id="_avaInput" name="blob" hidden style="display: none;">
+        </label>
+
+        <br><br>
+
+        <p>${tr('troubles_avatar')}</p>
+        <p>${tr('webcam_avatar')}</p>
+    </div>
+    `
+
+    let msg = MessageBox(tr('uploading_new_image'), body, [
+        tr('cancel')
+    ], [
+        (function() {
+            u("#tmpPhDelF").remove();
+        }),
+    ]);
+
+    msg.attr("style", "width: 600px;");
+    document.querySelector(".ovk-diag-body").style.padding = "13px"
+
+    $("#avatarUpload input").on("change", (ev) => {
+        let image = URL.createObjectURL(ev.currentTarget.files[0])
+        $(".ovk-diag-body")[0].innerHTML = `
+            <span>${!isGroup ? tr("selected_area_user") : tr("selected_area_club")}</span>
+
+            <p style="margin-bottom: 10px;">${tr("selected_area_rotate")}</p>
+
+            <div class="cropper-image-cont" style="max-height: 274px;">
+                <img src="${image}" id="temp_uploadPic">
+
+                <div class="rotateButtons">
+                    <div class="_rotateLeft hoverable"></div>
+                    <div class="_rotateRight hoverable"></div>
+                </div>
+            </div>
+
+            <label style="margin-top: 14px;display: block;">
+                <input id="publish_on_wall" type="checkbox" checked>${tr("publish_on_wall")}
+            </label>
+        `
+
+        document.querySelector(".ovk-diag-action").insertAdjacentHTML("beforeend", `
+            <button class="button" style="margin-left: 4px;" id="_uploadImg">${tr("upload_button")}</button>
+        `)
+        
+        const image_div = document.getElementById('temp_uploadPic');
+        const cropper = new Cropper(image_div, {
+            aspectRatio: NaN,
+            zoomable: true,
+            minCropBoxWidth: 150,
+            minCropBoxHeight: 150,
+            dragMode: 'move',
+            background: false,
+            center: false,
+            guides: false,
+            modal: true,
+            viewMode: 2,
+            cropstart(event) {
+                document.querySelector(".cropper-container").classList.add("moving")
+            },
+            cropend(event) {
+                document.querySelector(".cropper-container").classList.remove("moving")
+            },
+        });
+
+        msg.attr("style", "width: 487px;");
+
+        document.querySelector("#_uploadImg").onclick = (evv) => {
+            cropper.getCroppedCanvas({
+                fillColor: '#fff',
+                imageSmoothingEnabled: false,
+                imageSmoothingQuality: 'high',
+            }).toBlob((blob) => {
+                document.querySelector("#_uploadImg").classList.add("lagged")
+                let formdata = new FormData()
+                formdata.append("blob", blob)
+                formdata.append("ajax", 1)
+                formdata.append("on_wall", Number(document.querySelector("#publish_on_wall").checked))
+                formdata.append("hash", u("meta[name=csrf]").attr("value"))
+        
+                $.ajax({
+                    type: "POST",
+                    url: isGroup ? "/club" + group + "/al_avatar" : "/al_avatars",
+                    data: formdata,
+                    processData: false,
+                    contentType: false,
+                    error: (response) => {
+                        fastError(response.flash.message)
+                    },
+                    success: (response) => {
+                        document.querySelector("#_uploadImg").classList.remove("lagged")
+                        u("body").removeClass("dimmed");
+                        document.querySelector("html").style.overflowY = "scroll"
+                        u(".ovk-diag-cont").remove();
+
+                        if(!response.success) {
+                            fastError(response.flash.message)
+                            return
+                        }
+                        
+                        document.querySelector("#bigAvatar").src = response.url
+                        document.querySelector("#bigAvatar").parentNode.href = "/photo" + response.new_photo
+                    
+                        document.querySelector(".add_image_text").style.display = "none"
+                        document.querySelector(".avatar_controls").style.display = "block"
+                    }
+                })
+            })
+        }
+
+        $(".ovk-diag-body ._rotateLeft").on("click", (e) => {
+            cropper.rotate(90)
+        })
+
+        $(".ovk-diag-body ._rotateRight").on("click", (e) => {
+            cropper.rotate(-90)
+        })
+    })
+
+    $(".ovk-diag-body #_takeSelfie").on("click", (e) => {
+        $("#avatarUpload")[0].style.display = "none"
+
+        $(".ovk-diag-body")[0].insertAdjacentHTML("beforeend", `
+            <div id="_takeSelfieFrame" style="text-align: center;">
+                <video style="max-width: 100%;max-height: 479px;"></video>
+                <canvas id="_tempCanvas" style="position: absolute;">
+            </div>
+        `)
+
+        let video = document.querySelector("#_takeSelfieFrame video")
+
+        if(!navigator.mediaDevices) {
+            // ех вот бы месседжбоксы были бы классами
+            u("body").removeClass("dimmed");
+            document.querySelector("html").style.overflowY = "scroll"
+            u(".ovk-diag-cont").remove();
+
+            fastError(tr("your_browser_doesnt_support_webcam"))
+
+            return
+        }
+
+        navigator.mediaDevices
+        .getUserMedia({ video: true, audio: false })
+        .then((stream) => {
+            video.srcObject = stream;
+            video.play()
+
+            window._cameraStream = stream
+        })
+        .catch((err) => {
+            u("body").removeClass("dimmed");
+            document.querySelector("html").style.overflowY = "scroll"
+            u(".ovk-diag-cont").remove();
+
+            fastError(err)
+        });
+        
+        function __closeConnection() {
+            window._cameraStream.getTracks().forEach(track => track.stop())
+        }
+
+        document.querySelector(".ovk-diag-action").insertAdjacentHTML("beforeend", `
+            <button class="button" style="margin-left: 4px;" id="_takeSnap">${tr("take_snapshot")}</button>
+        `)
+
+        document.querySelector(".ovk-diag-action button").onclick = (evv) => {
+            __closeConnection()
+        }
+
+        document.querySelector("#_takeSnap").onclick = (evv) => {
+            let canvas = document.getElementById('_tempCanvas')
+            let context = canvas.getContext('2d')
+
+            canvas.setAttribute("width", video.clientWidth)
+            canvas.setAttribute("height", video.clientHeight)
+            context.drawImage(video, 0, 0, video.clientWidth, video.clientHeight);
+            canvas.toBlob((blob) => {
+                $("#_takeSnap").remove()
+                
+                let file = new File([blob], "snapshot.jpg", {type: "image/jpeg", lastModified: new Date().getTime()})
+                let dt = new DataTransfer();
+                dt.items.add(file);
+
+                $("#_avaInput")[0].files = dt.files
+                $("#_avaInput").trigger("change")
+                $("#_takeSelfieFrame").remove()
+
+                __closeConnection()
+            })
+        }
+    })
+})
+
+$(document).on("click", ".avatarDelete", (e) => {
+    let isGroup = e.currentTarget.closest(".avatar_block").dataset.club != null
+    let group = isGroup ? e.currentTarget.closest(".avatar_block").dataset.club : 0
+
+    let body = `
+        <span>${tr("deleting_avatar_sure")}</span>
+    `
+
+    let msg = MessageBox(tr('deleting_avatar'), body, [
+        tr('yes'),
+        tr('no')
+    ], [
+        (function() {
+            let formdata = new FormData()
+            formdata.append("hash", u("meta[name=csrf]").attr("value"))
+
+            $.ajax({
+                type: "POST",
+                url: isGroup ? "/club" + group + "/delete_avatar" : "/delete_avatar",
+                data: formdata,
+                processData: false,
+                contentType: false,
+                beforeSend: () => {
+                    document.querySelector(".avatarDelete").classList.add("lagged")
+                },
+                error: (response) => {
+                    fastError(response.flash.message)
+                },
+                success: (response) => {
+                    if(!response.success) {
+                        fastError(response.flash.message)
+                        return
+                    }
+
+                    document.querySelector(".avatarDelete").classList.remove("lagged")
+                    
+                    u("body").removeClass("dimmed");
+                    document.querySelector("html").style.overflowY = "scroll"
+                    u(".ovk-diag-cont").remove();
+
+                    document.querySelector("#bigAvatar").src = response.url
+                    document.querySelector("#bigAvatar").parentNode.href = response.new_photo ? ("/photo" + response.new_photo) : "javascript:void(0)"
+                    
+                    if(!response.has_new_photo) {
+                        document.querySelector(".avatar_controls").style.display = "none"
+                        document.querySelector(".add_image_text").style.display = "block"
+                    }
+                }
+            })
+        }),
+        (function() {
+            u("#tmpPhDelF").remove();
+        }),
+    ]);
 })
